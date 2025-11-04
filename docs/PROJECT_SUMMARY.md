@@ -1,4 +1,7 @@
-# 🎯 MPC Cryptocurrency Key Manager - Project Summary
+# 🎯 GuardianVault - Project Summary
+
+> **Multiple Guardians, One Secure Vault**
+> Enterprise-Grade Cryptocurrency Custody for SMEs
 
 ## What You Requested
 

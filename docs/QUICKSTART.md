@@ -1,11 +1,15 @@
-# 🚀 Quick Start Guide - MPC Cryptocurrency Key Manager
+# 🚀 GuardianVault - Quick Start Guide
 
-## What You've Got
+> **Multiple Guardians, One Secure Vault**
 
-A complete **Multi-Party Computation** system with **TWO implementations**:
+## What is GuardianVault?
 
-1. **Shamir's Secret Sharing (SSS)** - Traditional approach for cold storage
-2. **Threshold Cryptography (⭐ RECOMMENDED)** - Advanced MPC where private key is **NEVER** reconstructed
+**GuardianVault** is an enterprise-grade cryptocurrency custody system for SMEs. Assign trusted guardians from your team — no single person controls your crypto assets.
+
+## Two Guardian Models
+
+1. **Shamir's Secret Sharing (SSS)** - For cold storage vaults
+2. **Threshold Cryptography (⭐ RECOMMENDED)** - For active treasury accounts
 
 ### Core Files
 

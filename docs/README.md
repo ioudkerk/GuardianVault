@@ -1,6 +1,8 @@
-# Documentation Index
+# GuardianVault Documentation
 
-Complete documentation for the Multi-Party Computation Cryptocurrency Key Manager.
+> **Multiple Guardians, One Secure Vault**
+
+Complete documentation for GuardianVault - Enterprise-Grade Cryptocurrency Custody with Multi-Party Security.
 
 ## 📚 Documentation Structure
 

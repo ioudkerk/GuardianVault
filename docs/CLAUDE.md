@@ -1,15 +1,19 @@
-# CLAUDE.md
+# CLAUDE.md - Developer Guide for GuardianVault
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **Multiple Guardians, One Secure Vault**
+
+This file provides guidance to Claude Code (claude.ai/code) and other AI assistants when working with GuardianVault code.
 
 ## Project Overview
 
-Multi-Party Computation (MPC) Cryptocurrency Key Manager - A Python implementation for securely managing Bitcoin and Ethereum private keys using **two different approaches**:
+**GuardianVault** - Enterprise-Grade Cryptocurrency Custody for SMEs
 
-1. **Shamir's Secret Sharing (SSS)** - Traditional approach where shares reconstruct the private key temporarily
-2. **Threshold Cryptography (NEW)** - Advanced approach where private key is NEVER reconstructed
+A Python implementation for securely managing Bitcoin and Ethereum private keys for small and medium enterprises using **two different approaches**:
 
-**Core Concept**: Distribute key material across multiple parties where no single party has access to the complete private key.
+1. **Shamir's Secret Sharing (SSS)** - Traditional approach where guardian shares reconstruct keys temporarily
+2. **Threshold Cryptography (RECOMMENDED)** - Advanced approach where private key is NEVER reconstructed
+
+**Core Concept**: Distribute key control across multiple trusted guardians. No single guardian has access to the complete private key.
 
 ## Development Commands
 

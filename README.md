@@ -1,11 +1,27 @@
-# Multi-Party Computation Cryptocurrency Key Manager
+# GuardianVault
+
+> **Multiple Guardians, One Secure Vault**
+> Enterprise-Grade Cryptocurrency Custody with Multi-Party Security
 
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-blue.svg)](LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Bitcoin](https://img.shields.io/badge/Bitcoin-BIP32%2FBIP44-orange.svg)](https://github.com/bitcoin/bips)
 [![Ethereum](https://img.shields.io/badge/Ethereum-EIP--55-purple.svg)](https://eips.ethereum.org/EIPS/eip-55)
+[![Enterprise](https://img.shields.io/badge/Enterprise-SME%20Ready-green.svg)](#)
 
-A secure, distributed cryptocurrency key management system with **TWO implementations**:
+**GuardianVault** is an enterprise-grade cryptocurrency key management system designed for small and medium enterprises. Assign trusted guardians from your team — no single person controls your crypto assets.
+
+## 🏢 Perfect for SMEs
+
+- **Crypto-native businesses** managing company treasury
+- **Investment firms** holding digital assets
+- **Family offices** with cryptocurrency portfolios
+- **Traditional companies** entering the crypto space
+- **Venture capital firms** with token holdings
+
+---
+
+## 🔐 Two Security Approaches
 
 1. **Shamir's Secret Sharing (SSS)** - Traditional approach for cold storage
 2. **Threshold Cryptography (NEW)** - Advanced MPC where private key is **NEVER** reconstructed
@@ -23,31 +39,54 @@ A secure, distributed cryptocurrency key management system with **TWO implementa
 
 ---
 
-## 🔐 Core Concepts
+## 🔐 Why GuardianVault?
 
-### Approach 1: Shamir's Secret Sharing
-This system allows you to:
-1. **Generate** a master seed that can derive unlimited Bitcoin and Ethereum addresses
-2. **Split** the master seed into N shares using Shamir's Secret Sharing
-3. **Distribute** shares across multiple parties/locations
-4. **Derive** child keys and addresses by temporarily reconstructing the seed
-5. **Reconstruct** the seed only when needed using a threshold K of N shares
+### The Problem
+Traditional crypto custody creates risks for enterprises:
+- 💣 **Single point of failure** - One compromised employee = all funds at risk
+- 🔓 **Insider threats** - One person with complete control
+- 📉 **Key person risk** - What if the only keyholder leaves or is unavailable?
+- 💰 **Custodian fees** - Expensive third-party custody solutions
+
+### The GuardianVault Solution
+
+**Assign Multiple Guardians** - Distribute control across your trusted team members
+**Threshold Security** - Require 3 of 5 guardians to authorize transactions
+**No Single Point of Failure** - Private keys never exist in one place
+**Board-Level Control** - Perfect for governance and compliance
+
+---
+
+## 🛡️ Two Guardian Models
+
+### Approach 1: Shamir's Secret Sharing (SSS)
+**Best for:** Cold storage, backup vaults, long-term holdings
+
+**How it works:**
+1. **Split** master seed into N guardian shares (e.g., 5 shares)
+2. **Distribute** shares to different guardians/locations
+3. **Require** K guardians to collaborate (e.g., any 3 of 5)
+4. **Reconstruct** temporarily when needed for operations
+
+**Example:** Split vault key among CFO, CTO, CEO, 2 board members. Any 3 can access.
 
 ### Approach 2: Threshold Cryptography (⭐ RECOMMENDED)
-This system allows you to:
-1. **Generate** distributed key shares where private key **never exists anywhere**
-2. **Derive** account xpub using one-time threshold computation
-3. **Generate** unlimited addresses from xpub without any threshold computation
-4. **Sign** transactions using threshold ECDSA protocol without reconstructing key
-5. **Operate** with maximum security - key cannot be stolen because it never exists
+**Best for:** Active trading, hot wallets, operational accounts
 
-### Why This Matters
+**How it works:**
+1. **Generate** distributed key shares - private key **never exists anywhere**
+2. **Setup** one-time threshold computation for account
+3. **Generate** unlimited addresses without guardian interaction
+4. **Sign** transactions through multi-party protocol - key stays distributed
 
-- **No Single Point of Failure**: Private key material distributed across multiple parties
-- **Threshold Security**: Need collaboration of multiple parties for operations
-- **Distributed Trust**: No single party has complete control
-- **Unlimited Addresses**: Generate infinite addresses without threshold computation (new approach)
-- **True MPC**: Private key never reconstructed, not even temporarily (new approach)
+**Example:** Treasury account with 3 guardians. Generate deposit addresses freely, require all 3 to sign withdrawals.
+
+### Why Threshold Cryptography?
+
+- 🔐 **Maximum Security** - Key cannot be stolen because it never exists
+- ⚡ **Operational Efficiency** - Generate addresses without gathering guardians
+- 🏢 **Enterprise Ready** - Built for active business use
+- 🎯 **Compliance Friendly** - Clear audit trails, no single control point
 
 ## 📁 Files
 
