@@ -10,6 +10,19 @@ A secure, distributed cryptocurrency key management system with **TWO implementa
 1. **Shamir's Secret Sharing (SSS)** - Traditional approach for cold storage
 2. **Threshold Cryptography (NEW)** - Advanced MPC where private key is **NEVER** reconstructed
 
+## 📚 Documentation
+
+**👉 Start here:** [Quick Start Guide](docs/QUICKSTART.md)
+
+**Full documentation:** See [docs/](docs/) folder
+- 📖 [Quick Start](docs/QUICKSTART.md) - Get started quickly
+- 📊 [Project Summary](docs/PROJECT_SUMMARY.md) - Overview and comparison
+- 🏗️ [Architecture](docs/ARCHITECTURE.md) - Shamir's SSS details
+- 🔐 [Threshold Crypto](docs/ARCHITECTURE_THRESHOLD.md) - Advanced MPC architecture
+- 💻 [Developer Guide](docs/CLAUDE.md) - For contributors and AI assistants
+
+---
+
 ## 🔐 Core Concepts
 
 ### Approach 1: Shamir's Secret Sharing
@@ -52,10 +65,13 @@ This system allows you to:
 
 ### Documentation
 - **`requirements.txt`**: Python dependencies
-- **`CLAUDE.md`**: Developer guide for Claude Code
-- **`ARCHITECTURE.md`**: Detailed system architecture
-- **`QUICKSTART.md`**: Quick start guide
-- **`PROJECT_SUMMARY.md`**: Project overview
+- **`docs/`**: Complete documentation
+  - **[QUICKSTART.md](docs/QUICKSTART.md)**: Quick start guide
+  - **[PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)**: Project overview
+  - **[CLAUDE.md](docs/CLAUDE.md)**: Developer guide for Claude Code
+  - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Shamir's SSS architecture
+  - **[ARCHITECTURE_THRESHOLD.md](docs/ARCHITECTURE_THRESHOLD.md)**: Threshold crypto architecture
+  - **[README.md](docs/README.md)**: Documentation index and navigation
 
 ## 🚀 Installation
 
