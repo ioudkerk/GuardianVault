@@ -1,5 +1,10 @@
 # Multi-Party Computation Cryptocurrency Key Manager
 
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-blue.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Bitcoin](https://img.shields.io/badge/Bitcoin-BIP32%2FBIP44-orange.svg)](https://github.com/bitcoin/bips)
+[![Ethereum](https://img.shields.io/badge/Ethereum-EIP--55-purple.svg)](https://eips.ethereum.org/EIPS/eip-55)
+
 A secure, distributed cryptocurrency key management system with **TWO implementations**:
 
 1. **Shamir's Secret Sharing (SSS)** - Traditional approach for cold storage
@@ -453,7 +458,17 @@ Contributions welcome! Areas for improvement:
 
 ## 📄 License
 
-MIT License - See LICENSE file for details
+**Non-Commercial Open Source License**
+
+This software is licensed under a custom non-commercial license:
+- ✅ Free for personal, educational, and research use
+- ✅ Modify and redistribute (non-commercial)
+- ✅ Full source code access
+- ❌ Commercial use or sale prohibited without separate license
+
+See [LICENSE](LICENSE) file for full terms.
+
+For commercial licensing inquiries, contact: ioudkerk@gmail.com
 
 ## 🔗 Related Projects
 
