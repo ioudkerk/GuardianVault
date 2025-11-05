@@ -162,3 +162,24 @@ shares/
 # Test outputs
 test_shares/
 test_keys/
+
+# Guardian app placeholder (not ready for commit)
+guardian-app/
+
+# Guardian Desktop App
+guardian-app/node_modules/
+guardian-app/dist/
+guardian-app/build/
+guardian-app/release/
+guardian-app/.vite/
+guardian-app/*.dmg
+guardian-app/*.zip
+guardian-app/*.exe
+guardian-app/*.deb
+guardian-app/*.AppImage
+
+# Coordination Server
+coordination-server/.env
+coordination-server/__pycache__/
+coordination-server/app/__pycache__/
+coordination-server/app/*/__pycache__/

@@ -11,6 +11,23 @@
 
 **GuardianVault** is an enterprise-grade cryptocurrency key management system designed for small and medium enterprises. Assign trusted guardians from your team — no single person controls your crypto assets.
 
+## ✅ Current Status (November 2025)
+
+**MPC Coordination Server: WORKING!** ✅
+
+The core threshold cryptography system is fully operational:
+- ✅ 4-round threshold ECDSA signing protocol
+- ✅ Real-time coordination server (FastAPI + Socket.IO + MongoDB)
+- ✅ Complete end-to-end test passing
+- ✅ Valid signatures generated without ever reconstructing private key
+
+**Next Steps:** See `/todo/` folder for development roadmap:
+1. Guardian Desktop Application (Electron) - HIGH PRIORITY
+2. Production Security Hardening (JWT, TLS, Rate Limiting) - HIGH PRIORITY
+3. Blockchain Integration (Transaction Broadcasting) - MEDIUM PRIORITY
+4. Admin Web Dashboard - MEDIUM PRIORITY
+5. Mobile Guardian App - LOW PRIORITY
+
 ## 🏢 Perfect for SMEs
 
 - **Crypto-native businesses** managing company treasury
@@ -36,6 +53,16 @@
 - 🏗️ [Architecture](docs/ARCHITECTURE.md) - Shamir's SSS details
 - 🔐 [Threshold Crypto](docs/ARCHITECTURE_THRESHOLD.md) - Advanced MPC architecture
 - 💻 [Developer Guide](docs/CLAUDE.md) - For contributors and AI assistants
+- 🎯 [Coordination Server](QUICK_START.md) - Quick start for MPC server
+
+**Development Roadmap:** See [todo/](todo/) folder
+- 📋 [Development Overview](todo/README.md) - Current status and priorities
+- 🖥️ [Guardian Desktop App](todo/01-GUARDIAN-APP.md) - Electron application
+- 🔒 [Security Hardening](todo/02-SECURITY.md) - Production security
+- ⛓️ [Blockchain Integration](todo/03-BLOCKCHAIN.md) - Transaction broadcasting
+- 📊 [Admin Dashboard](todo/04-ADMIN-DASHBOARD.md) - Web management interface
+- 📱 [Mobile App](todo/05-MOBILE.md) - iOS and Android
+- 🚀 [Future Enhancements](todo/99-FUTURE-ENHANCEMENTS.md) - Long-term vision
 
 ---
 
@@ -96,11 +123,15 @@ Traditional crypto custody creates risks for enterprises:
 - **`mpc_cli.py`**: Command-line interface
 - **`mpc_workflow_example.py`**: Practical demonstration
 
-### Threshold Cryptography Implementation (NEW)
+### Threshold Cryptography Implementation (✅ WORKING!)
 - **`threshold_mpc_keymanager.py`**: Threshold key generation and BIP32 derivation
-- **`threshold_addresses.py`**: Address generation from xpub (no private keys!)
-- **`threshold_signing.py`**: Threshold ECDSA signing protocol
-- **`complete_mpc_workflow.py`**: End-to-end demonstration
+- **`threshold_addresses.py`**: Bitcoin/Ethereum address generation from public keys
+- **`threshold_signing.py`**: 4-round threshold ECDSA signing protocol
+- **`complete_mpc_workflow.py`**: Full demonstration
+- **`coordination-server/`**: Production MPC coordination server (FastAPI + MongoDB + Socket.IO)
+- **`test_coordination_server.py`**: End-to-end test workflow (✅ PASSES!)
+- **`debug_transaction.py`**: MongoDB transaction inspector
+- **`QUICK_START.md`**: Quick start guide for coordination server
 
 ### Documentation
 - **`requirements.txt`**: Python dependencies

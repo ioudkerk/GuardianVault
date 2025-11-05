@@ -44,6 +44,22 @@ Complete documentation for GuardianVault - Enterprise-Grade Cryptocurrency Custo
    - Security analysis and attack vectors
    - Mathematical proofs and examples
 
+### For UI/UX and Implementation
+
+6. **[UI_ARCHITECTURE.md](UI_ARCHITECTURE.md)** - Complete UI/UX specification
+   - Admin Web Dashboard design
+   - Guardian Desktop App design
+   - Coordination Server architecture
+   - API specifications
+   - Implementation roadmap
+
+7. **[GUARDIAN_APP_IMPLEMENTATION.md](GUARDIAN_APP_IMPLEMENTATION.md)** - Guardian Desktop App implementation
+   - Complete Electron app structure
+   - Security architecture
+   - Feature implementation details
+   - Development workflow
+   - Deployment guide
+
 ## 🎯 Quick Navigation
 
 ### By Use Case
@@ -63,6 +79,12 @@ Complete documentation for GuardianVault - Enterprise-Grade Cryptocurrency Custo
 **I want to understand Threshold Cryptography:**
 → See [ARCHITECTURE_THRESHOLD.md](ARCHITECTURE_THRESHOLD.md)
 
+**I want to build the UI:**
+→ Start with [UI_ARCHITECTURE.md](UI_ARCHITECTURE.md)
+
+**I want to understand the Guardian App:**
+→ See [GUARDIAN_APP_IMPLEMENTATION.md](GUARDIAN_APP_IMPLEMENTATION.md)
+
 ### By Implementation
 
 **Shamir's Secret Sharing (Traditional):**
@@ -79,25 +101,32 @@ Complete documentation for GuardianVault - Enterprise-Grade Cryptocurrency Custo
 
 ```
 docs/
-├── README.md (this file)              # Navigation and index
-├── QUICKSTART.md                      # Quick start guide
-├── PROJECT_SUMMARY.md                 # Project overview
-├── CLAUDE.md                          # Developer guide
-├── ARCHITECTURE.md                    # Shamir's SSS architecture
-└── ARCHITECTURE_THRESHOLD.md          # Threshold crypto architecture
+├── README.md (this file)                   # Navigation and index
+├── QUICKSTART.md                           # Quick start guide
+├── PROJECT_SUMMARY.md                      # Project overview
+├── CLAUDE.md                               # Developer guide
+├── ARCHITECTURE.md                         # Shamir's SSS architecture
+├── ARCHITECTURE_THRESHOLD.md               # Threshold crypto architecture
+├── UI_ARCHITECTURE.md                      # UI/UX specification (NEW)
+└── GUARDIAN_APP_IMPLEMENTATION.md          # Guardian App details (NEW)
 
 ../ (root directory)
-├── README.md                          # Main project README
-├── LICENSE                            # Non-commercial license
-├── requirements.txt                   # Python dependencies
-├── crypto_mpc_keymanager.py          # Shamir's SSS implementation
-├── enhanced_crypto_mpc.py            # Shamir's address generation
-├── mpc_cli.py                        # CLI tool for Shamir's
-├── mpc_workflow_example.py           # Shamir's demo
-├── threshold_mpc_keymanager.py       # Threshold MPC implementation
-├── threshold_addresses.py            # Threshold address generation
-├── threshold_signing.py              # Threshold ECDSA signing
-└── complete_mpc_workflow.py          # Complete threshold demo
+├── README.md                               # Main project README
+├── LICENSE                                 # Non-commercial license
+├── requirements.txt                        # Python dependencies
+├── crypto_mpc_keymanager.py               # Shamir's SSS implementation
+├── enhanced_crypto_mpc.py                 # Shamir's address generation
+├── mpc_cli.py                             # CLI tool for Shamir's
+├── mpc_workflow_example.py                # Shamir's demo
+├── threshold_mpc_keymanager.py            # Threshold MPC implementation
+├── threshold_addresses.py                 # Threshold address generation
+├── threshold_signing.py                   # Threshold ECDSA signing
+├── complete_mpc_workflow.py               # Complete threshold demo
+└── guardian-app/                          # Guardian Desktop App (NEW)
+    ├── src/main/                          # Electron main process
+    ├── src/renderer/                      # React UI
+    ├── package.json                       # Dependencies
+    └── README.md                          # App documentation
 ```
 
 ## 🤖 For AI/LLM Developers
@@ -149,8 +178,27 @@ If you're an AI assistant (like Claude Code, GPT, etc.) helping develop this pro
 python threshold_mpc_keymanager.py
 python complete_mpc_workflow.py
 
+# Test coordination server (NEW - WORKING!)
+python test_coordination_server.py
+
+# Debug transactions
+python debug_transaction.py
+
 # Use correct Python path
 /Users/ivan/.virtualenvs/claude-mcp/bin/python <script>
+```
+
+**Coordination Server:**
+```bash
+# Start MongoDB
+docker run -d -p 27017:27017 --name mongodb mongo:latest
+
+# Start coordination server
+cd coordination-server
+/Users/ivan/.virtualenvs/claude-mcp/bin/python -m app.main
+
+# Server runs at: http://localhost:8000
+# API docs at: http://localhost:8000/docs
 ```
 
 ## 🔧 Extending the Project
