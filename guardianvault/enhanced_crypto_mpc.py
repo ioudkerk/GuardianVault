@@ -6,7 +6,7 @@ Requires: pip install ecdsa base58 eth-hash[pycryptodome]
 
 import hashlib
 from typing import Tuple
-from crypto_mpc_keymanager import DistributedKeyManager, KeyShare
+from .crypto_mpc_keymanager import DistributedKeyManager, KeyShare
 
 
 class BitcoinAddress:

@@ -7,7 +7,7 @@ Easy-to-use command-line interface for common operations
 import argparse
 import sys
 import os
-from crypto_mpc_keymanager import DistributedKeyManager, KeyShare
+from guardianvault.crypto_mpc_keymanager import DistributedKeyManager, KeyShare
 
 
 def generate_and_split(args):

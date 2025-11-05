@@ -1,0 +1,65 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "guardianvault-coordination-server"
+version = "0.1.0"
+description = "Coordination server for GuardianVault multi-party computation signing"
+authors = ["GuardianVault Team"]
+license = "Non-Commercial Open Source License"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+# Web framework
+fastapi = "^0.108.0"
+uvicorn = {extras = ["standard"], version = "^0.25.0"}
+python-socketio = "^5.10.0"
+python-multipart = "^0.0.6"
+
+# Database
+motor = "^3.3.2"
+pymongo = "^4.6.1"
+
+# Data validation
+email-validator = ">=2.3.0"
+pydantic = ">=2.10.0"
+pydantic-settings = ">=2.7.0"
+
+# Authentication & Security
+python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+passlib = {extras = ["bcrypt"], version = "^1.7.4"}
+python-dotenv = "^1.0.0"
+
+# Utilities
+python-dateutil = "^2.8.2"
+shortuuid = "^1.0.11"
+
+# GuardianVault core library dependencies
+# (These could be replaced with guardianvault package when installed)
+ecdsa = ">=0.18.0"
+base58 = ">=2.1.1"
+eth-hash = {extras = ["pycryptodome"], version = ">=0.5.2"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+pytest-asyncio = "^0.21.1"
+httpx = "^0.25.2"
+black = ">=23.0.0"
+ruff = ">=0.1.0"
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+asyncio_mode = "auto"

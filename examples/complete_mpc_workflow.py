@@ -10,7 +10,7 @@ import secrets
 import json
 from typing import List, Dict
 
-from threshold_mpc_keymanager import (
+from guardianvault.threshold_mpc_keymanager import (
     ThresholdKeyGeneration,
     ThresholdBIP32,
     ExtendedPublicKey,
@@ -18,11 +18,11 @@ from threshold_mpc_keymanager import (
     save_xpub_to_file,
     load_xpub_from_file
 )
-from threshold_addresses import (
+from guardianvault.threshold_addresses import (
     BitcoinAddressGenerator,
     EthereumAddressGenerator
 )
-from threshold_signing import (
+from guardianvault.threshold_signing import (
     ThresholdSigningWorkflow
 )
 

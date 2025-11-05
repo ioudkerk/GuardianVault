@@ -1,0 +1,70 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "guardianvault"
+version = "0.1.0"
+description = "Multi-Party Computation Cryptocurrency Key Manager with threshold cryptography"
+authors = ["GuardianVault Team"]
+license = "Non-Commercial Open Source License"
+readme = "README.md"
+homepage = "https://github.com/yourusername/guardianvault"
+repository = "https://github.com/yourusername/guardianvault"
+keywords = ["cryptocurrency", "mpc", "threshold", "cryptography", "bitcoin", "ethereum"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security :: Cryptography",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+packages = [{include = "guardianvault"}]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+ecdsa = ">=0.18.0"
+base58 = ">=2.1.1"
+eth-hash = {extras = ["pycryptodome"], version = ">=0.5.2"}
+cryptography = ">=41.0.0"
+pynacl = ">=1.5.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=7.4.0"
+pytest-cov = ">=4.1.0"
+pytest-asyncio = ">=0.21.1"
+aiohttp = ">=3.8.0"
+black = ">=23.0.0"
+ruff = ">=0.1.0"
+mypy = ">=1.0.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = ">=7.4.0"
+pytest-cov = ">=4.1.0"
+pytest-asyncio = ">=0.21.1"
+python-socketio = ">=5.10.0"
+requests = ">=2.31.0"
+
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "-v --cov=guardianvault --cov-report=html --cov-report=term"

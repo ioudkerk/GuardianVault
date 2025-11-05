@@ -15,7 +15,7 @@ import secrets
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 
-from threshold_mpc_keymanager import (
+from .threshold_mpc_keymanager import (
     KeyShare,
     EllipticCurvePoint,
     SECP256K1_N
@@ -329,7 +329,7 @@ class ThresholdSigningWorkflow:
 
 if __name__ == "__main__":
     import secrets as sec
-    from threshold_mpc_keymanager import ThresholdKeyGeneration
+    from .threshold_mpc_keymanager import ThresholdKeyGeneration
 
     print("=" * 80)
     print("THRESHOLD ECDSA SIGNING DEMO")

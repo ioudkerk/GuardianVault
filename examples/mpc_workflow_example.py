@@ -4,7 +4,7 @@ Practical MPC Workflow Example
 Demonstrates a realistic multi-party computation scenario for key management
 """
 
-from crypto_mpc_keymanager import DistributedKeyManager, KeyShare
+from guardianvault.crypto_mpc_keymanager import DistributedKeyManager, KeyShare
 import json
 import os
 

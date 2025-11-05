@@ -25,15 +25,15 @@ from ecdsa.ellipticcurve import Point
 import hashlib
 import secrets
 
-# Import existing threshold crypto modules
-from threshold_mpc_keymanager import (
+# Import existing threshold crypto modules from guardianvault package
+from guardianvault.threshold_mpc_keymanager import (
     ThresholdKeyGeneration,
     ThresholdBIP32,
     KeyShare as ThresholdKeyShare,
     ExtendedPublicKey
 )
-from threshold_signing import ThresholdSigner, KeyShare
-from threshold_addresses import BitcoinAddressGenerator, EthereumAddressGenerator
+from guardianvault.threshold_signing import ThresholdSigner, KeyShare
+from guardianvault.threshold_addresses import BitcoinAddressGenerator, EthereumAddressGenerator
 
 # Configuration
 COORD_SERVER_URL = "http://localhost:8000"

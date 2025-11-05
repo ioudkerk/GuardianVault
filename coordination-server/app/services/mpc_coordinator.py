@@ -8,12 +8,12 @@ from datetime import datetime
 from typing import Dict, List, Tuple
 import logging
 
-# Add parent directory to path to import threshold crypto modules
+# Add parent directory to path to import guardianvault package
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from threshold_signing import ThresholdSigner
-from threshold_mpc_keymanager import EllipticCurvePoint, SECP256K1_N
+from guardianvault.threshold_signing import ThresholdSigner
+from guardianvault.threshold_mpc_keymanager import EllipticCurvePoint, SECP256K1_N
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,7 @@ Works with threshold_mpc_keymanager.py for TRUE MPC (no private key reconstructi
 
 import hashlib
 from typing import List
-from threshold_mpc_keymanager import (
+from .threshold_mpc_keymanager import (
     ExtendedPublicKey,
     PublicKeyDerivation,
     EllipticCurvePoint
@@ -250,7 +250,7 @@ class EthereumAddressGenerator:
 
 if __name__ == "__main__":
     import secrets
-    from threshold_mpc_keymanager import (
+    from .threshold_mpc_keymanager import (
         ThresholdKeyGeneration,
         ThresholdBIP32
     )
