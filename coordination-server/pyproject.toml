@@ -9,6 +9,7 @@ description = "Coordination server for GuardianVault multi-party computation sig
 authors = ["GuardianVault Team"]
 license = "Non-Commercial Open Source License"
 readme = "README.md"
+packages = [{include = "app"}]
 
 [tool.poetry.dependencies]
 python = "^3.9"

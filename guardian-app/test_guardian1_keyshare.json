@@ -1,0 +1,7 @@
+{
+  "guardian_id": 1,
+  "x": "11a8f1eb02a17bbdd67079755758f0a27c3072cd86b412373cfd08f6391e5c4b",
+  "total_shares": 3,
+  "threshold": 3,
+  "master_public_key": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+}

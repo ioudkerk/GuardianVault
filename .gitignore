@@ -162,12 +162,12 @@ shares/
 test_shares/
 test_keys/
 
-# Guardian app placeholder (not ready for commit)
-guardian-app/
-
-# Guardian Desktop App
+# Guardian Desktop App - build artifacts only
 guardian-app/node_modules/
+guardian-app/out/
 guardian-app/dist/
+guardian-app/dist-electron/
+guardian-app/dist-renderer/
 guardian-app/build/
 guardian-app/release/
 guardian-app/.vite/
