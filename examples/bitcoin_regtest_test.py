@@ -134,8 +134,16 @@ class BitcoinRPCClient:
         return self.call("sendrawtransaction", [rawtx])
 
     def importaddress(self, address: str, label: str = "", rescan: bool = False):
-        """Import address as watch-only"""
+        """Import address as watch-only (legacy wallet only)"""
         return self.call("importaddress", [address, label, rescan])
+
+    def scantxoutset(self, action: str, scanobjects: list):
+        """Scan the UTXO set for addresses (works without wallet)"""
+        return self.call("scantxoutset", [action, scanobjects])
+
+    def getaddressinfo(self, address: str):
+        """Get information about an address"""
+        return self.call("getaddressinfo", [address])
 
     def gettxout(self, txid: str, vout: int, include_mempool: bool = True):
         """Get details about an unspent transaction output"""
@@ -500,29 +508,46 @@ def main():
         print("❌ Transaction not confirmed yet")
     print()
 
-    print("Step 3: Check balances")
+    print("Step 3: Check balances using scantxoutset (works with descriptor wallets)")
     print("-" * 80)
 
-    # Check MPC address balance (should have change)
+    # Check MPC address balance using scantxoutset (no wallet needed)
     try:
-        # Import address as watch-only to check balance
-        rpc.importaddress(first_address['address'], "MPC Address", False)
-        utxos = rpc.listunspent(1, 9999999, [first_address['address']])
-        mpc_balance = sum(utxo['amount'] for utxo in utxos)
+        # Scan UTXO set for MPC address
+        scan_result = rpc.scantxoutset("start", [f"addr({first_address['address']})"])
+        mpc_balance = scan_result.get('total_amount', 0)
+        mpc_utxo_count = len(scan_result.get('unspents', []))
+
         print(f"  MPC Address ({first_address['address']})")
         print(f"    Balance: {mpc_balance} BTC")
-        print(f"    UTXOs: {len(utxos)}")
+        print(f"    UTXOs: {mpc_utxo_count}")
+
+        # Verify change amount is correct (1.0 - 0.5 - 0.0001 fee = 0.4999)
+        expected_change = 0.4999
+        if abs(mpc_balance - expected_change) < 0.0001:
+            print(f"    ✓ Change amount correct (~{expected_change} BTC)")
+        else:
+            print(f"    ⚠️  Expected ~{expected_change} BTC, got {mpc_balance} BTC")
     except Exception as e:
         print(f"  Could not check MPC address balance: {e}")
 
     # Check recipient balance
     try:
-        rpc.importaddress(recipient_address, "Recipient", False)
-        recipient_utxos = rpc.listunspent(1, 9999999, [recipient_address])
-        recipient_balance = sum(utxo['amount'] for utxo in recipient_utxos)
+        # Scan UTXO set for recipient address
+        scan_result = rpc.scantxoutset("start", [f"addr({recipient_address})"])
+        recipient_balance = scan_result.get('total_amount', 0)
+        recipient_utxo_count = len(scan_result.get('unspents', []))
+
         print(f"  Recipient Address ({recipient_address})")
         print(f"    Balance: {recipient_balance} BTC")
-        print(f"    UTXOs: {len(recipient_utxos)}")
+        print(f"    UTXOs: {recipient_utxo_count}")
+
+        # Verify received amount is correct (0.5 BTC)
+        expected_amount = 0.5
+        if abs(recipient_balance - expected_amount) < 0.0001:
+            print(f"    ✓ Received amount correct ({expected_amount} BTC)")
+        else:
+            print(f"    ⚠️  Expected {expected_amount} BTC, got {recipient_balance} BTC")
     except Exception as e:
         print(f"  Could not check recipient balance: {e}")
 
