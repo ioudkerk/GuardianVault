@@ -1,0 +1,111 @@
+services:
+  bitcoin-regtest:
+    image: lncm/bitcoind:v27.0
+    container_name: guardianvault-bitcoin-regtest
+    command: >
+      -regtest
+      -server
+      -rpcuser=regtest
+      -rpcpassword=regtest
+      -rpcallowip=0.0.0.0/0
+      -rpcbind=0.0.0.0
+      -fallbackfee=0.00001
+      -txindex=1
+      -zmqpubrawblock=tcp://0.0.0.0:28332
+      -zmqpubrawtx=tcp://0.0.0.0:28333
+    ports:
+      - "18443:18443"  # RPC port
+      - "18444:18444"  # P2P port
+      - "28332:28332"  # ZMQ block
+      - "28333:28333"  # ZMQ tx
+    volumes:
+      - bitcoin-regtest-data:/root/.bitcoin
+    networks:
+      - regtest-network
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=regtest", "-rpcpassword=regtest", "getblockchaininfo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mempool-db:
+    image: mariadb:10.11
+    container_name: guardianvault-mempool-db
+    environment:
+      MYSQL_DATABASE: mempool
+      MYSQL_USER: mempool
+      MYSQL_PASSWORD: mempool
+      MYSQL_ROOT_PASSWORD: admin
+      MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+    volumes:
+      - mempool-db-data:/var/lib/mysql
+    networks:
+      - regtest-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "mempool", "-pmempool"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mempool-backend:
+    image: mempool/backend:latest
+    container_name: guardianvault-mempool-backend
+    environment:
+      # Core Bitcoin RPC
+      CORE_RPC_HOST: bitcoin-regtest
+      CORE_RPC_PORT: 18443
+      CORE_RPC_USERNAME: regtest
+      CORE_RPC_PASSWORD: regtest
+
+      # Database
+      DATABASE_ENABLED: "true"
+      DATABASE_HOST: mempool-db
+      DATABASE_DATABASE: mempool
+      DATABASE_USERNAME: mempool
+      DATABASE_PASSWORD: mempool
+
+      # Network
+      MEMPOOL_NETWORK: testnet
+      MEMPOOL_BACKEND: none
+      MEMPOOL_BLOCKS_AMOUNT: 8
+
+      # API
+      API_SERVICES_ENABLED: "true"
+
+      # Statistics
+      STATISTICS_ENABLED: "true"
+
+      # Mining - Disable pool detection for regtest
+      MINING_POOLS: "[]"
+      MINING_POOLS_UPDATE_INTERVAL: 0
+    depends_on:
+      bitcoin-regtest:
+        condition: service_healthy
+      mempool-db:
+        condition: service_healthy
+    networks:
+      - regtest-network
+    restart: unless-stopped
+
+  mempool-web:
+    image: mempool/frontend:latest
+    container_name: guardianvault-mempool-web
+    environment:
+      FRONTEND_HTTP_PORT: 8080
+      BACKEND_MAINNET_HTTP_HOST: mempool-backend
+    ports:
+      - "8080:8080"  # Mempool UI
+    depends_on:
+      - mempool-backend
+    networks:
+      - regtest-network
+    restart: unless-stopped
+
+networks:
+  regtest-network:
+    driver: bridge
+
+volumes:
+  bitcoin-regtest-data:
+  mempool-db-data:

@@ -163,7 +163,7 @@ def generate_key_shares(num_parties: int = 3, threshold: int = 3):
 
     # Generate addresses for verification
     print_info("\nGenerating Bitcoin address from public key...")
-    btc_address = BitcoinAddressGenerator.pubkey_to_address(btc_pub_final, testnet=False)
+    btc_address = BitcoinAddressGenerator.pubkey_to_address(btc_pub_final, network="mainnet")
     print_success(f"Bitcoin Address: {btc_address}")
 
     return parties_data, btc_address

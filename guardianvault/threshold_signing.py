@@ -245,7 +245,8 @@ class ThresholdSigningWorkflow:
     def sign_message(
         key_shares: List[KeyShare],
         message: bytes,
-        public_key: bytes
+        public_key: bytes,
+        prehashed: bool = False
     ) -> ThresholdSignature:
         """
         Complete threshold signing workflow
@@ -254,16 +255,25 @@ class ThresholdSigningWorkflow:
 
         Args:
             key_shares: Private key shares from all parties
-            message: Message to sign
+            message: Message to sign (or message hash if prehashed=True)
             public_key: Combined public key (for verification)
+            prehashed: If True, message is already a hash and won't be hashed again
 
         Returns:
             Threshold signature
         """
-        # Hash the message
-        message_hash = hashlib.sha256(message).digest()
+        # Hash the message (unless it's already a hash)
+        if prehashed:
+            message_hash = message
+        else:
+            message_hash = hashlib.sha256(message).digest()
 
-        print(f"\nSigning message: {message.decode('utf-8')}")
+        # Try to decode as UTF-8, otherwise show hex
+        try:
+            message_str = message.decode('utf-8')
+            print(f"\nSigning message: {message_str}")
+        except UnicodeDecodeError:
+            print(f"\nSigning message (hex): {message.hex()[:64]}...")
         print(f"Message hash: {message_hash.hex()[:32]}...")
         print()
 
