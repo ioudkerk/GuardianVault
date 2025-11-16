@@ -17,17 +17,27 @@ class BitcoinAddressGenerator:
     """Generate Bitcoin addresses from public keys (no private key needed!)"""
 
     @staticmethod
-    def pubkey_to_address(public_key: bytes, testnet: bool = False) -> str:
+    def pubkey_to_address(public_key: bytes, network: str = "mainnet") -> str:
         """
         Convert public key to Bitcoin P2PKH address
 
         Args:
             public_key: 33-byte compressed public key
-            testnet: If True, generate testnet address
+            network: Network type - "mainnet", "testnet", or "regtest"
+                    (default: "mainnet")
 
         Returns:
-            Bitcoin address string (e.g., "1A1zP1...")
+            Bitcoin address string (e.g., "1A1zP1..." for mainnet, "m..." or "n..." for testnet/regtest)
+
+        Note:
+            - Mainnet uses version byte 0x00 (addresses start with "1")
+            - Testnet uses version byte 0x6f (addresses start with "m" or "n")
+            - Regtest uses version byte 0x6f (same as testnet)
         """
+        # Validate network parameter
+        if network not in ["mainnet", "testnet", "regtest"]:
+            raise ValueError(f"Invalid network '{network}'. Must be 'mainnet', 'testnet', or 'regtest'")
+
         # Hash the public key: SHA256 then RIPEMD160
         sha256_hash = hashlib.sha256(public_key).digest()
 
@@ -36,8 +46,8 @@ class BitcoinAddressGenerator:
         ripemd160.update(sha256_hash)
         pubkey_hash = ripemd160.digest()
 
-        # Add version byte (0x00 for mainnet, 0x6f for testnet)
-        version = b'\x6f' if testnet else b'\x00'
+        # Add version byte (0x00 for mainnet, 0x6f for testnet/regtest)
+        version = b'\x6f' if network in ["testnet", "regtest"] else b'\x00'
         versioned_hash = version + pubkey_hash
 
         # Calculate checksum (first 4 bytes of double SHA256)
@@ -78,7 +88,7 @@ class BitcoinAddressGenerator:
         change: int = 0,
         start_index: int = 0,
         count: int = 10,
-        testnet: bool = False
+        network: str = "mainnet"
     ) -> List[dict]:
         """
         Generate multiple Bitcoin addresses from xpub
@@ -88,7 +98,7 @@ class BitcoinAddressGenerator:
             change: 0 for receiving, 1 for change
             start_index: Starting address index
             count: Number of addresses to generate
-            testnet: Generate testnet addresses
+            network: Network type - "mainnet", "testnet", or "regtest" (default: "mainnet")
 
         Returns:
             List of dicts with path, public_key, and address
@@ -110,7 +120,7 @@ class BitcoinAddressGenerator:
             address_pubkey, _ = PublicKeyDerivation.derive_public_child(change_xpub, i)
 
             # Generate address
-            address = BitcoinAddressGenerator.pubkey_to_address(address_pubkey, testnet)
+            address = BitcoinAddressGenerator.pubkey_to_address(address_pubkey, network)
 
             addresses.append({
                 'path': f"m/44'/0'/0'/{change}/{i}",
