@@ -3,6 +3,16 @@ from typing import List
 import shortuuid
 from datetime import datetime, timedelta
 import hashlib
+import logging
+import sys
+import os
+from pathlib import Path
+
+# Add parent directory to path to import guardianvault package
+project_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from guardianvault.bitcoin_transaction import BitcoinTransactionBuilder
 
 from ..database import get_database
 from ..models.transaction import (
@@ -16,13 +26,38 @@ from ..models.vault import Vault
 from ..config import settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Will be set by main.py
+sio = None
 
 
-def compute_message_hash(transaction_data: dict) -> str:
+def compute_message_hash(tx_create: TransactionCreate) -> str:
     """Compute message hash for transaction"""
-    # In production, this should create proper Bitcoin/Ethereum transaction hash
-    # For now, create a simple hash of transaction data
-    data_str = f"{transaction_data['amount']}{transaction_data['recipient']}{transaction_data['vault_id']}"
+    # For Bitcoin with UTXO details, compute real sighash
+    if tx_create.coin_type == "bitcoin" and tx_create.utxo_txid and tx_create.sender_address:
+        try:
+            # Build the actual Bitcoin transaction
+            tx_builder, script_code = BitcoinTransactionBuilder.build_p2pkh_transaction(
+                utxo_txid=tx_create.utxo_txid,
+                utxo_vout=tx_create.utxo_vout,
+                utxo_amount_btc=float(tx_create.utxo_amount),
+                sender_address=tx_create.sender_address,
+                recipient_address=tx_create.recipient,
+                send_amount_btc=float(tx_create.amount),
+                fee_btc=float(tx_create.fee or "0.0001")
+            )
+
+            # Compute the sighash
+            sighash = tx_builder.get_sighash(input_index=0, script_code=script_code)
+            return sighash.hex()
+        except Exception as e:
+            logger.error(f"Failed to compute Bitcoin sighash: {e}")
+            # Fall back to simple hash
+            pass
+
+    # Fallback: simple hash for Ethereum or if Bitcoin UTXO details missing
+    data_str = f"{tx_create.amount}{tx_create.recipient}{tx_create.vault_id}"
     return hashlib.sha256(data_str.encode()).hexdigest()
 
 
@@ -58,8 +93,8 @@ async def create_transaction(tx_create: TransactionCreate):
     # Generate transaction ID
     transaction_id = f"tx_{shortuuid.uuid()[:12]}"
 
-    # Compute message hash
-    message_hash = compute_message_hash(tx_create.model_dump())
+    # Compute message hash (proper Bitcoin sighash if UTXO details provided)
+    message_hash = compute_message_hash(tx_create)
 
     # Calculate timeout
     timeout_at = datetime.utcnow() + timedelta(seconds=settings.transaction_timeout)
@@ -74,6 +109,12 @@ async def create_transaction(tx_create: TransactionCreate):
         recipient=tx_create.recipient,
         fee=tx_create.fee,
         memo=tx_create.memo,
+        # Bitcoin-specific fields for exact reconstruction
+        utxo_txid=tx_create.utxo_txid,
+        utxo_vout=tx_create.utxo_vout,
+        utxo_amount=tx_create.utxo_amount,
+        sender_address=tx_create.sender_address,
+        address_index=tx_create.address_index,
         message_hash=message_hash,
         status=TransactionStatus.PENDING,
         signatures_required=vault.threshold,
@@ -91,6 +132,23 @@ async def create_transaction(tx_create: TransactionCreate):
             "$set": {"updated_at": datetime.utcnow()},
         },
     )
+
+    # Notify guardians via WebSocket
+    if sio:
+        logger.info(f"Notifying guardians in vault {tx_create.vault_id} about transaction {transaction_id}")
+        await sio.emit(
+            "signing:new_transaction",
+            {
+                "transactionId": transaction_id,
+                "type": tx_create.type,
+                "amount": tx_create.amount,
+                "recipient": tx_create.recipient,
+                "messageHash": message_hash,
+            },
+            room=f"vault_{tx_create.vault_id}",
+        )
+    else:
+        logger.warning("Socket.IO server not available, guardians will not be notified")
 
     return TransactionResponse.from_transaction(transaction)
 
