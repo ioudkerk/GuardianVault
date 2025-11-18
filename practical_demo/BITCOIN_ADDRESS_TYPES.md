@@ -32,6 +32,20 @@ GuardianVault now supports all three major Bitcoin address formats for generatin
 
 **When to use**: Maximum privacy, lowest fees, future-proof
 
+## Important Limitation: P2TR Spending
+
+⚠️ **Taproot (P2TR) spending is not yet supported** because Taproot requires **Schnorr signatures**, while GuardianVault's current MPC implementation uses **ECDSA signatures**.
+
+**What works:**
+- ✅ Generate P2TR addresses for receiving funds
+- ✅ Send TO P2TR addresses (as recipients)
+- ✅ Use P2TR addresses for change outputs
+
+**What doesn't work yet:**
+- ❌ Spending FROM P2TR addresses (requires Schnorr MPC implementation)
+
+**Workaround**: Use P2PKH or P2WPKH addresses for spending. These work perfectly with the current ECDSA-based MPC signing protocol.
+
 ## Usage
 
 ### Generate Different Address Types
@@ -83,6 +97,44 @@ Index    Type       Address                                       Used   Path
 1        p2pkh      muwtUh7U2dczESzuuxtpjGcvbZfsRBH7V4                m/44'/0'/0'/0/1
 2        p2wpkh     bcrt1qwckd2arlvluhxws7g4w7xaymfj2ekg5...         m/44'/0'/0'/0/2
 ```
+
+### Use Address Types in Transactions
+
+The `cli_create_and_broadcast.py` script automatically detects the address type from the tracking file:
+
+```bash
+# Auto-detect address type from bitcoin_addresses.json
+python3 cli_create_and_broadcast.py \
+    --vault-id vault_123 \
+    --vault-config demo_output/vault_config.json \
+    --recipient bcrt1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh \
+    --amount 0.5 \
+    --address-index 5
+# If index 5 is P2WPKH in the tracking file, it will be used automatically
+
+# Explicitly specify address type (overrides tracking file)
+python3 cli_create_and_broadcast.py \
+    --vault-id vault_123 \
+    --vault-config demo_output/vault_config.json \
+    --recipient bcrt1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh \
+    --amount 0.5 \
+    --address-index 6 \
+    --address-type p2wpkh
+
+# Send TO a Taproot address (as recipient - this works!)
+python3 cli_create_and_broadcast.py \
+    --vault-id vault_123 \
+    --vault-config demo_output/vault_config.json \
+    --recipient bcrt1p... \
+    --amount 0.5 \
+    --address-index 3 \
+    --address-type p2pkh
+```
+
+**Address Type Detection Logic:**
+1. If `--address-type` specified → use it
+2. Else if address found in `bitcoin_addresses.json` → use its type
+3. Else → default to P2PKH
 
 ## Technical Details
 
