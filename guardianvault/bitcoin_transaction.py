@@ -10,6 +10,91 @@ from typing import List, Tuple
 from dataclasses import dataclass
 
 
+class Bech32:
+    """Bech32 encoding/decoding for SegWit addresses"""
+
+    CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+
+    @classmethod
+    def bech32_polymod(cls, values):
+        """Compute Bech32 checksum"""
+        gen = cls.GENERATOR
+        chk = 1
+        for value in values:
+            b = chk >> 25
+            chk = (chk & 0x1ffffff) << 5 ^ value
+            for i in range(5):
+                chk ^= gen[i] if ((b >> i) & 1) else 0
+        return chk
+
+    @classmethod
+    def bech32_hrp_expand(cls, hrp):
+        """Expand human-readable part for checksum"""
+        return [ord(x) >> 5 for x in hrp] + [0] + [ord(x) & 31 for x in hrp]
+
+    @classmethod
+    def bech32_verify_checksum(cls, hrp, data):
+        """Verify Bech32 checksum"""
+        return cls.bech32_polymod(cls.bech32_hrp_expand(hrp) + data) == 1
+
+    @classmethod
+    def bech32_decode(cls, bech):
+        """Decode a Bech32 string"""
+        if ((any(ord(x) < 33 or ord(x) > 126 for x in bech)) or
+                (bech.lower() != bech and bech.upper() != bech)):
+            return (None, None)
+        bech = bech.lower()
+        pos = bech.rfind('1')
+        if pos < 1 or pos + 7 > len(bech) or len(bech) > 90:
+            return (None, None)
+        if not all(x in cls.CHARSET for x in bech[pos+1:]):
+            return (None, None)
+        hrp = bech[:pos]
+        data = [cls.CHARSET.find(x) for x in bech[pos+1:]]
+        if not cls.bech32_verify_checksum(hrp, data):
+            return (None, None)
+        return (hrp, data[:-6])
+
+    @classmethod
+    def convertbits(cls, data, frombits, tobits, pad=True):
+        """Convert between bit groups"""
+        acc = 0
+        bits = 0
+        ret = []
+        maxv = (1 << tobits) - 1
+        max_acc = (1 << (frombits + tobits - 1)) - 1
+        for value in data:
+            if value < 0 or (value >> frombits):
+                return None
+            acc = ((acc << frombits) | value) & max_acc
+            bits += frombits
+            while bits >= tobits:
+                bits -= tobits
+                ret.append((acc >> bits) & maxv)
+        if pad:
+            if bits:
+                ret.append((acc << (tobits - bits)) & maxv)
+        elif bits >= frombits or ((acc << (tobits - bits)) & maxv):
+            return None
+        return ret
+
+    @classmethod
+    def decode_segwit_address(cls, hrp, addr):
+        """Decode a SegWit address"""
+        hrpgot, data = cls.bech32_decode(addr)
+        if hrpgot != hrp:
+            return (None, None)
+        decoded = cls.convertbits(data[1:], 5, 8, False)
+        if decoded is None or len(decoded) < 2 or len(decoded) > 40:
+            return (None, None)
+        if data[0] > 16:
+            return (None, None)
+        if data[0] == 0 and len(decoded) != 20 and len(decoded) != 32:
+            return (None, None)
+        return (data[0], decoded)
+
+
 @dataclass
 class TxInput:
     """Bitcoin transaction input"""
@@ -72,25 +157,80 @@ class BitcoinTransaction:
         return bytes([0x76, 0xa9, 0x14]) + address_hash + bytes([0x88, 0xac])
 
     @staticmethod
-    def decode_address_to_hash(address: str) -> bytes:
+    def create_p2wpkh_script(witness_program: bytes) -> bytes:
         """
-        Decode a Bitcoin address to get the 20-byte hash
+        Create a Pay-to-Witness-PubKey-Hash (P2WPKH) script
 
         Args:
-            address: Bitcoin address (base58)
+            witness_program: 20-byte hash160(pubkey)
 
         Returns:
-            20-byte hash
+            Script bytes: OP_0 <20 bytes>
         """
-        import base58
+        # OP_0 (0x00) <length> <witness_program>
+        return bytes([0x00, 0x14]) + witness_program
 
-        # Decode base58
-        decoded = base58.b58decode(address)
+    @staticmethod
+    def decode_address_to_hash(address: str) -> Tuple[bytes, str]:
+        """
+        Decode a Bitcoin address to get the hash and address type
 
-        # Remove version byte (first) and checksum (last 4 bytes)
-        address_hash = decoded[1:-4]
+        Args:
+            address: Bitcoin address (base58 or bech32)
 
-        return address_hash
+        Returns:
+            Tuple of (hash bytes, address_type)
+            - For P2PKH: (20-byte hash, 'p2pkh')
+            - For P2WPKH: (20-byte hash, 'p2wpkh')
+        """
+        # Check if bech32 (SegWit native)
+        if address.startswith('bc1') or address.startswith('tb1') or address.startswith('bcrt1'):
+            # Bech32 address (P2WPKH or P2WSH)
+            # Determine HRP (human-readable part)
+            if address.startswith('bc1'):
+                hrp = 'bc'
+            elif address.startswith('tb1'):
+                hrp = 'tb'
+            elif address.startswith('bcrt1'):
+                hrp = 'bcrt'
+            else:
+                raise ValueError(f"Unknown bech32 prefix: {address[:4]}")
+
+            # Decode bech32
+            witver, witprog = Bech32.decode_segwit_address(hrp, address)
+
+            if witver is None:
+                raise ValueError(f"Invalid bech32 address: {address}")
+
+            if witver == 0 and len(witprog) == 20:
+                # P2WPKH (witness version 0, 20 bytes)
+                return (bytes(witprog), 'p2wpkh')
+            elif witver == 0 and len(witprog) == 32:
+                # P2WSH (witness version 0, 32 bytes)
+                return (bytes(witprog), 'p2wsh')
+            else:
+                raise ValueError(f"Unsupported witness version or program length: v{witver}, {len(witprog)} bytes")
+        else:
+            # Base58 address (P2PKH or P2SH)
+            import base58
+
+            # Decode base58
+            decoded = base58.b58decode(address)
+
+            # Remove version byte (first) and checksum (last 4 bytes)
+            address_hash = decoded[1:-4]
+
+            # Check version byte to determine type
+            version = decoded[0]
+
+            # P2PKH: mainnet=0x00, testnet=0x6f, regtest=0x6f
+            # P2SH: mainnet=0x05, testnet=0xc4, regtest=0xc4
+            if version in [0x00, 0x6f]:
+                return (address_hash, 'p2pkh')
+            elif version in [0x05, 0xc4]:
+                return (address_hash, 'p2sh')
+            else:
+                raise ValueError(f"Unknown address version byte: {hex(version)}")
 
     def serialize_for_signing(self, input_index: int, script_code: bytes, sighash_type: int = 1) -> bytes:
         """
@@ -257,7 +397,7 @@ class BitcoinTransactionBuilder:
         fee_btc: float = 0.00001
     ) -> Tuple[BitcoinTransaction, bytes]:
         """
-        Build a P2PKH transaction
+        Build a Bitcoin transaction (supports P2PKH and P2WPKH addresses)
 
         Args:
             utxo_txid: Transaction ID of UTXO to spend
@@ -284,19 +424,40 @@ class BitcoinTransactionBuilder:
         tx.add_input(utxo_txid, utxo_vout)
 
         # Add output to recipient
-        recipient_hash = BitcoinTransaction.decode_address_to_hash(recipient_address)
-        recipient_script = BitcoinTransaction.create_p2pkh_script(recipient_hash)
+        recipient_hash, recipient_type = BitcoinTransaction.decode_address_to_hash(recipient_address)
+
+        if recipient_type == 'p2wpkh':
+            recipient_script = BitcoinTransaction.create_p2wpkh_script(recipient_hash)
+        elif recipient_type == 'p2pkh':
+            recipient_script = BitcoinTransaction.create_p2pkh_script(recipient_hash)
+        else:
+            raise ValueError(f"Unsupported recipient address type: {recipient_type}")
+
         tx.add_output(send_amount_btc, recipient_script)
 
         # Add change output if significant (dust threshold = 0.00001 BTC)
         if change_amount_btc >= 0.00001:
-            sender_hash = BitcoinTransaction.decode_address_to_hash(sender_address)
-            change_script = BitcoinTransaction.create_p2pkh_script(sender_hash)
+            sender_hash, sender_type = BitcoinTransaction.decode_address_to_hash(sender_address)
+
+            if sender_type == 'p2wpkh':
+                change_script = BitcoinTransaction.create_p2wpkh_script(sender_hash)
+            elif sender_type == 'p2pkh':
+                change_script = BitcoinTransaction.create_p2pkh_script(sender_hash)
+            else:
+                raise ValueError(f"Unsupported sender address type: {sender_type}")
+
             tx.add_output(change_amount_btc, change_script)
 
         # Create script_code for signing (the scriptPubKey of the output being spent)
-        sender_hash = BitcoinTransaction.decode_address_to_hash(sender_address)
-        script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        sender_hash, sender_type = BitcoinTransaction.decode_address_to_hash(sender_address)
+
+        if sender_type == 'p2wpkh':
+            # For P2WPKH, script_code is P2PKH of the same hash
+            script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        elif sender_type == 'p2pkh':
+            script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        else:
+            raise ValueError(f"Unsupported sender address type: {sender_type}")
 
         return tx, script_code
 

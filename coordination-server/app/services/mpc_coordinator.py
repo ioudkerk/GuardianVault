@@ -255,17 +255,37 @@ class MPCCoordinator:
             if s_combined > SECP256K1_N // 2:
                 s_combined = SECP256K1_N - s_combined
 
+            # Create DER-encoded signature for Bitcoin
+            def encode_der_integer(value: int) -> bytes:
+                """Encode an integer in DER format"""
+                # Handle zero case
+                if value == 0:
+                    return bytes([0x02, 0x01, 0x00])
+
+                value_bytes = value.to_bytes(32, 'big').lstrip(b'\x00')
+
+                # Ensure at least one byte remains
+                if not value_bytes:
+                    value_bytes = b'\x00'
+
+                # If high bit is set, prepend 0x00 to indicate positive number
+                if value_bytes[0] & 0x80:
+                    value_bytes = b'\x00' + value_bytes
+                return bytes([0x02, len(value_bytes)]) + value_bytes
+
+            r_der = encode_der_integer(r)
+            s_der = encode_der_integer(s_combined)
+            der_sig = bytes([0x30, len(r_der) + len(s_der)]) + r_der + s_der
+
             # Create final signature (store large ints as strings for MongoDB)
             final_signature = {
                 "r": str(r),  # Store as string - too large for MongoDB int
                 "s": str(s_combined),  # Store as string - too large for MongoDB int
                 "rHex": r.to_bytes(32, 'big').hex(),
                 "sHex": s_combined.to_bytes(32, 'big').hex(),
+                "der": der_sig.hex(),  # DER-encoded signature for Bitcoin
                 "created_at": datetime.utcnow().isoformat(),
             }
-
-            # TODO: Create DER encoding
-            # final_signature["der"] = create_der_signature(r, s_combined)
 
             # Update transaction as completed
             await self.db.transactions.update_one(
@@ -315,6 +335,7 @@ class MPCCoordinator:
                 "k_total": int(round2_data["kTotal"]),
                 "r": int(round2_data["r"]),
                 "num_parties": tx_doc["signatures_required"],
+                "message_hash": tx_doc["message_hash"],  # Include message hash for signature computation
             },
         }
 
