@@ -11,10 +11,12 @@ from dataclasses import dataclass
 
 
 class Bech32:
-    """Bech32 encoding/decoding for SegWit addresses"""
+    """Bech32/Bech32m encoding/decoding for SegWit addresses"""
 
     CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
     GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+    BECH32_CONST = 1
+    BECH32M_CONST = 0x2bc830a3
 
     @classmethod
     def bech32_polymod(cls, values):
@@ -34,27 +36,48 @@ class Bech32:
         return [ord(x) >> 5 for x in hrp] + [0] + [ord(x) & 31 for x in hrp]
 
     @classmethod
-    def bech32_verify_checksum(cls, hrp, data):
-        """Verify Bech32 checksum"""
-        return cls.bech32_polymod(cls.bech32_hrp_expand(hrp) + data) == 1
+    def bech32_verify_checksum(cls, hrp, data, const):
+        """Verify Bech32/Bech32m checksum"""
+        return cls.bech32_polymod(cls.bech32_hrp_expand(hrp) + data) == const
+
+    @classmethod
+    def bech32_create_checksum(cls, hrp, data, const):
+        """Create Bech32/Bech32m checksum"""
+        values = cls.bech32_hrp_expand(hrp) + data
+        polymod = cls.bech32_polymod(values + [0, 0, 0, 0, 0, 0]) ^ const
+        return [(polymod >> 5 * (5 - i)) & 31 for i in range(6)]
+
+    @classmethod
+    def bech32_encode(cls, hrp, data, const):
+        """Encode Bech32/Bech32m string"""
+        combined = data + cls.bech32_create_checksum(hrp, data, const)
+        return hrp + '1' + ''.join([cls.CHARSET[d] for d in combined])
 
     @classmethod
     def bech32_decode(cls, bech):
-        """Decode a Bech32 string"""
+        """Decode a Bech32/Bech32m string - returns (hrp, data, encoding)"""
         if ((any(ord(x) < 33 or ord(x) > 126 for x in bech)) or
                 (bech.lower() != bech and bech.upper() != bech)):
-            return (None, None)
+            return (None, None, None)
         bech = bech.lower()
         pos = bech.rfind('1')
         if pos < 1 or pos + 7 > len(bech) or len(bech) > 90:
-            return (None, None)
+            return (None, None, None)
         if not all(x in cls.CHARSET for x in bech[pos+1:]):
-            return (None, None)
+            return (None, None, None)
         hrp = bech[:pos]
         data = [cls.CHARSET.find(x) for x in bech[pos+1:]]
-        if not cls.bech32_verify_checksum(hrp, data):
-            return (None, None)
-        return (hrp, data[:-6])
+
+        # Try Bech32 first, then Bech32m
+        encoding = None
+        if cls.bech32_verify_checksum(hrp, data, cls.BECH32_CONST):
+            encoding = 'bech32'
+        elif cls.bech32_verify_checksum(hrp, data, cls.BECH32M_CONST):
+            encoding = 'bech32m'
+        else:
+            return (None, None, None)
+
+        return (hrp, data[:-6], encoding)
 
     @classmethod
     def convertbits(cls, data, frombits, tobits, pad=True):
@@ -81,8 +104,8 @@ class Bech32:
 
     @classmethod
     def decode_segwit_address(cls, hrp, addr):
-        """Decode a SegWit address"""
-        hrpgot, data = cls.bech32_decode(addr)
+        """Decode a SegWit address (v0-v16)"""
+        hrpgot, data, encoding = cls.bech32_decode(addr)
         if hrpgot != hrp:
             return (None, None)
         decoded = cls.convertbits(data[1:], 5, 8, False)
@@ -90,9 +113,35 @@ class Bech32:
             return (None, None)
         if data[0] > 16:
             return (None, None)
-        if data[0] == 0 and len(decoded) != 20 and len(decoded) != 32:
-            return (None, None)
+
+        # Witness v0 uses bech32, v1+ use bech32m
+        if data[0] == 0:
+            if encoding != 'bech32':
+                return (None, None)
+            if len(decoded) != 20 and len(decoded) != 32:
+                return (None, None)
+        else:
+            if encoding != 'bech32m':
+                return (None, None)
+            # Taproot (v1) requires 32 bytes
+            if data[0] == 1 and len(decoded) != 32:
+                return (None, None)
+
         return (data[0], decoded)
+
+    @classmethod
+    def encode_segwit_address(cls, hrp, witver, witprog):
+        """Encode a SegWit address"""
+        # Witness v0 uses bech32, v1+ use bech32m
+        const = cls.BECH32_CONST if witver == 0 else cls.BECH32M_CONST
+
+        # Convert witness program to 5-bit groups
+        data = cls.convertbits(witprog, 8, 5)
+        if data is None:
+            return None
+
+        # Encode with witness version
+        return cls.bech32_encode(hrp, [witver] + data, const)
 
 
 @dataclass
@@ -176,16 +225,18 @@ class BitcoinTransaction:
         Decode a Bitcoin address to get the hash and address type
 
         Args:
-            address: Bitcoin address (base58 or bech32)
+            address: Bitcoin address (base58, bech32, or bech32m)
 
         Returns:
             Tuple of (hash bytes, address_type)
             - For P2PKH: (20-byte hash, 'p2pkh')
             - For P2WPKH: (20-byte hash, 'p2wpkh')
+            - For P2WSH: (32-byte hash, 'p2wsh')
+            - For P2TR: (32-byte x-only pubkey, 'p2tr')
         """
-        # Check if bech32 (SegWit native)
+        # Check if bech32/bech32m (SegWit native)
         if address.startswith('bc1') or address.startswith('tb1') or address.startswith('bcrt1'):
-            # Bech32 address (P2WPKH or P2WSH)
+            # Bech32 or Bech32m address (P2WPKH, P2WSH, or P2TR)
             # Determine HRP (human-readable part)
             if address.startswith('bc1'):
                 hrp = 'bc'
@@ -196,18 +247,21 @@ class BitcoinTransaction:
             else:
                 raise ValueError(f"Unknown bech32 prefix: {address[:4]}")
 
-            # Decode bech32
+            # Decode bech32/bech32m
             witver, witprog = Bech32.decode_segwit_address(hrp, address)
 
             if witver is None:
-                raise ValueError(f"Invalid bech32 address: {address}")
+                raise ValueError(f"Invalid bech32/bech32m address: {address}")
 
             if witver == 0 and len(witprog) == 20:
-                # P2WPKH (witness version 0, 20 bytes)
+                # P2WPKH (witness version 0, 20 bytes) - bech32
                 return (bytes(witprog), 'p2wpkh')
             elif witver == 0 and len(witprog) == 32:
-                # P2WSH (witness version 0, 32 bytes)
+                # P2WSH (witness version 0, 32 bytes) - bech32
                 return (bytes(witprog), 'p2wsh')
+            elif witver == 1 and len(witprog) == 32:
+                # P2TR (witness version 1, 32 bytes) - bech32m (Taproot)
+                return (bytes(witprog), 'p2tr')
             else:
                 raise ValueError(f"Unsupported witness version or program length: v{witver}, {len(witprog)} bytes")
         else:

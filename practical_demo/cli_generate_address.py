@@ -39,7 +39,7 @@ def get_next_address_index(config_file: str, coin_type: str) -> int:
     return 0
 
 
-def save_address_tracking(config_file: str, coin_type: str, index: int, address: str, pubkey: str):
+def save_address_tracking(config_file: str, coin_type: str, index: int, address: str, pubkey: str, address_type: str = "p2pkh"):
     """Save address to tracking file"""
     tracking_file = config_file.replace('vault_config.json', f'{coin_type}_addresses.json')
 
@@ -52,6 +52,7 @@ def save_address_tracking(config_file: str, coin_type: str, index: int, address:
     data['addresses'].append({
         'index': index,
         'address': address,
+        'address_type': address_type,
         'public_key': pubkey,
         'path': f"m/44'/{0 if coin_type == 'bitcoin' else 60}'/0'/0/{index}",
         'used': False
@@ -62,7 +63,7 @@ def save_address_tracking(config_file: str, coin_type: str, index: int, address:
         json.dump(data, f, indent=2)
 
 
-def generate_bitcoin_address(vault_config: dict, index: int, change: int = 0) -> tuple:
+def generate_bitcoin_address(vault_config: dict, index: int, change: int = 0, address_type: str = "p2pkh") -> tuple:
     """
     Generate Bitcoin address at given index
 
@@ -70,9 +71,10 @@ def generate_bitcoin_address(vault_config: dict, index: int, change: int = 0) ->
         vault_config: Vault configuration
         index: Address index
         change: Change level (0=receive, 1=change)
+        address_type: Address type ("p2pkh", "p2wpkh", or "p2tr")
 
     Returns:
-        (address, public_key, derivation_path)
+        (address, public_key, derivation_path, address_type)
     """
     # Get account xpub (m/44'/0'/0')
     account_xpub = ExtendedPublicKey.from_dict(vault_config['bitcoin']['xpub'])
@@ -91,12 +93,12 @@ def generate_bitcoin_address(vault_config: dict, index: int, change: int = 0) ->
     # Derive address level (m/44'/0'/0'/change/index)
     address_pubkey, _ = PublicKeyDerivation.derive_public_child(change_xpub, index)
 
-    # Generate address
-    address = BitcoinAddressGenerator.pubkey_to_address(address_pubkey, network=network)
+    # Generate address with specified type
+    address = BitcoinAddressGenerator.pubkey_to_address(address_pubkey, network=network, address_type=address_type)
 
     derivation_path = f"m/44'/0'/0'/{change}/{index}"
 
-    return address, address_pubkey.hex(), derivation_path
+    return address, address_pubkey.hex(), derivation_path, address_type
 
 
 def generate_ethereum_address(vault_config: dict, index: int, change: int = 0) -> tuple:
@@ -146,19 +148,27 @@ def list_addresses(config_file: str, coin_type: str):
     with open(tracking_file, 'r') as f:
         data = json.load(f)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'='*80}")
     print(f"{coin_type.upper()} ADDRESSES")
-    print(f"{'='*70}")
+    print(f"{'='*80}")
     print(f"Total addresses: {len(data['addresses'])}")
     print(f"Next index: {data['next_index']}")
-    print(f"\n{'Index':<8} {'Address':<45} {'Used':<6} Path")
-    print(f"{'-'*70}")
+
+    if coin_type == 'bitcoin':
+        print(f"\n{'Index':<8} {'Type':<10} {'Address':<45} {'Used':<6} Path")
+    else:
+        print(f"\n{'Index':<8} {'Address':<45} {'Used':<6} Path")
+    print(f"{'-'*80}")
 
     for addr in data['addresses']:
         used = '✓' if addr.get('used', False) else ''
-        print(f"{addr['index']:<8} {addr['address']:<45} {used:<6} {addr['path']}")
+        if coin_type == 'bitcoin':
+            addr_type = addr.get('address_type', 'p2pkh')
+            print(f"{addr['index']:<8} {addr_type:<10} {addr['address']:<45} {used:<6} {addr['path']}")
+        else:
+            print(f"{addr['index']:<8} {addr['address']:<45} {used:<6} {addr['path']}")
 
-    print(f"{'='*70}\n")
+    print(f"{'='*80}\n")
 
 
 def main():
@@ -167,11 +177,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Generate next Bitcoin address
+  # Generate next Bitcoin address (legacy P2PKH)
   python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin
 
+  # Generate SegWit address (P2WPKH)
+  python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --type p2wpkh
+
+  # Generate Taproot address (P2TR)
+  python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --type p2tr
+
   # Generate Bitcoin address at specific index
-  python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --index 5
+  python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --index 5 --type p2tr
 
   # Generate Ethereum address
   python3 cli_generate_address.py --config demo_output/vault_config.json --coin ethereum
@@ -179,8 +195,8 @@ Examples:
   # List all generated Bitcoin addresses
   python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --list
 
-  # Generate multiple addresses
-  python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --count 5
+  # Generate multiple Taproot addresses
+  python3 cli_generate_address.py --config demo_output/vault_config.json --coin bitcoin --type p2tr --count 5
         """
     )
 
@@ -188,6 +204,8 @@ Examples:
                        help='Path to vault configuration file')
     parser.add_argument('--coin', type=str, choices=['bitcoin', 'ethereum'], required=True,
                        help='Coin type (bitcoin or ethereum)')
+    parser.add_argument('--type', '-t', type=str, choices=['p2pkh', 'p2wpkh', 'p2tr'], default='p2pkh',
+                       help='Address type for Bitcoin: p2pkh (legacy), p2wpkh (segwit), p2tr (taproot) (default: p2pkh)')
     parser.add_argument('--index', '-i', type=int, default=None,
                        help='Address index (default: next available)')
     parser.add_argument('--change', type=int, default=0,
@@ -228,18 +246,23 @@ Examples:
             index = start_index + i
 
             if args.coin == 'bitcoin':
-                address, pubkey, path = generate_bitcoin_address(vault_config, index, args.change)
+                address, pubkey, path, addr_type = generate_bitcoin_address(
+                    vault_config, index, args.change, args.type
+                )
             else:  # ethereum
                 address, pubkey, path = generate_ethereum_address(vault_config, index, args.change)
+                addr_type = "ethereum"
 
             print(f"Address #{index}:")
             print(f"  Path:       {path}")
+            if args.coin == 'bitcoin':
+                print(f"  Type:       {addr_type}")
             print(f"  Address:    {address}")
             print(f"  Public Key: {pubkey[:32]}...{pubkey[-32:]}")
 
             # Save to tracking file
             if not args.no_save:
-                save_address_tracking(args.config, args.coin, index, address, pubkey)
+                save_address_tracking(args.config, args.coin, index, address, pubkey, addr_type)
                 print(f"  ✓ Saved to tracking file")
 
             print()
