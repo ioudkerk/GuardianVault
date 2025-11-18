@@ -56,6 +56,26 @@ class BitcoinRPCClient:
         return self.rpc_call("getrawtransaction", [txid, verbose])
 
 
+def get_address_type_from_tracking(vault_config_file: str, address_index: int) -> str:
+    """Get address type from tracking file if it exists"""
+    tracking_file = vault_config_file.replace('vault_config.json', 'bitcoin_addresses.json')
+
+    if os.path.exists(tracking_file):
+        try:
+            with open(tracking_file, 'r') as f:
+                data = json.load(f)
+                addresses = data.get('addresses', [])
+
+                # Find address with matching index
+                for addr in addresses:
+                    if addr.get('index') == address_index:
+                        return addr.get('address_type', 'p2pkh')
+        except Exception as e:
+            print(f"  Warning: Could not read tracking file: {e}")
+
+    return None
+
+
 async def complete_transaction_flow(
     server_url: str,
     vault_id: str,
@@ -64,7 +84,8 @@ async def complete_transaction_flow(
     amount: float,
     fee: float,
     address_index: int,
-    memo: str
+    memo: str,
+    address_type: str = None
 ):
     """Complete flow: Create transaction with UTXO, wait for signing, broadcast"""
 
@@ -77,12 +98,39 @@ async def complete_transaction_flow(
     with open(vault_config_file, 'r') as f:
         vault_config = json.load(f)
 
+    # Determine address type
+    if address_type is None:
+        # Try to read from tracking file
+        address_type = get_address_type_from_tracking(vault_config_file, address_index)
+        if address_type:
+            print(f"  ℹ️  Found address type '{address_type}' for index {address_index} in tracking file")
+        else:
+            # Default to p2pkh
+            address_type = 'p2pkh'
+            print(f"  ℹ️  No address type specified, defaulting to '{address_type}'")
+    else:
+        print(f"  ℹ️  Using specified address type: '{address_type}'")
+
+    # Check if we're trying to spend from P2TR
+    if address_type == 'p2tr':
+        print(f"\n❌ ERROR: Cannot spend from P2TR (Taproot) addresses")
+        print(f"   Taproot requires Schnorr signatures, but GuardianVault currently uses ECDSA")
+        print(f"   You can:")
+        print(f"   - Use a P2PKH or P2WPKH address for spending (--address-type p2pkh or p2wpkh)")
+        print(f"   - Generate a new P2WPKH address: python3 cli_generate_address.py --coin bitcoin --type p2wpkh")
+        print(f"   - Send TO Taproot addresses (as recipient), but cannot spend FROM them yet")
+        return False
+
     xpub = ExtendedPublicKey.from_dict(vault_config['bitcoin']['xpub'])
     pubkeys = PublicKeyDerivation.derive_address_public_keys(xpub, change=0, num_addresses=address_index + 1)
     sender_pubkey = pubkeys[address_index]
-    sender_address = BitcoinAddressGenerator.pubkey_to_address(sender_pubkey, network="regtest")
+    sender_address = BitcoinAddressGenerator.pubkey_to_address(
+        sender_pubkey,
+        network="regtest",
+        address_type=address_type
+    )
 
-    print(f"✓ Sender address: {sender_address} (index {address_index})")
+    print(f"✓ Sender address: {sender_address} (index {address_index}, type: {address_type})")
 
     # Step 2: Find UTXO for sender address
     print("\nStep 2: Finding UTXO...")
@@ -246,21 +294,43 @@ async def main():
         description="Complete transaction flow: create, sign with MPC, broadcast",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Example:
+Examples:
+  # Use address from tracking file (auto-detects type)
   python3 cli_create_and_broadcast.py \\
       --vault-id vault_abc123 \\
-      --vault-config demo_shares/vault_config.json \\
+      --vault-config demo_output/vault_config.json \\
       --recipient bcrt1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh \\
       --amount 0.5 \\
-      --fee 0.0001 \\
-      --address-index 0 \\
-      --memo "Demo payment"
+      --address-index 5
+
+  # Explicitly specify P2WPKH sender address
+  python3 cli_create_and_broadcast.py \\
+      --vault-id vault_abc123 \\
+      --vault-config demo_output/vault_config.json \\
+      --recipient bcrt1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh \\
+      --amount 0.5 \\
+      --address-index 6 \\
+      --address-type p2wpkh \\
+      --memo "SegWit payment"
+
+  # Send to Taproot address (P2TR recipient is supported)
+  python3 cli_create_and_broadcast.py \\
+      --vault-id vault_abc123 \\
+      --vault-config demo_output/vault_config.json \\
+      --recipient bcrt1p... \\
+      --amount 0.5 \\
+      --address-index 3 \\
+      --address-type p2pkh
 
 This will:
-  1. Find UTXO for sender address
-  2. Create transaction with proper Bitcoin sighash
-  3. Wait for guardians to sign via MPC
-  4. Broadcast to Bitcoin network
+  1. Detect or use specified sender address type
+  2. Find UTXO for sender address
+  3. Create transaction with proper Bitcoin sighash
+  4. Wait for guardians to sign via MPC
+  5. Broadcast to Bitcoin network
+
+Note: Spending FROM P2TR addresses is not yet supported (requires Schnorr signatures).
+      You can send TO P2TR addresses, but must use P2PKH or P2WPKH for spending.
         """
     )
 
@@ -278,6 +348,8 @@ This will:
                        help='Fee in BTC (default: 0.0001)')
     parser.add_argument('--address-index', type=int, default=0,
                        help='Sender address derivation index (default: 0)')
+    parser.add_argument('--address-type', '-t', type=str, choices=['p2pkh', 'p2wpkh', 'p2tr'],
+                       help='Address type (p2pkh, p2wpkh, p2tr). If not specified, reads from bitcoin_addresses.json or defaults to p2pkh. Note: P2TR spending not yet supported.')
     parser.add_argument('--memo', '-m', type=str, default='',
                        help='Transaction memo')
 
@@ -292,7 +364,8 @@ This will:
             amount=args.amount,
             fee=args.fee,
             address_index=args.address_index,
-            memo=args.memo
+            memo=args.memo,
+            address_type=args.address_type
         )
 
         sys.exit(0 if success else 1)

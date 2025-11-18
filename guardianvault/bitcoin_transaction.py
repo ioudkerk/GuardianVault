@@ -206,6 +206,22 @@ class BitcoinTransaction:
         return bytes([0x76, 0xa9, 0x14]) + address_hash + bytes([0x88, 0xac])
 
     @staticmethod
+    def create_p2tr_script(x_only_pubkey: bytes) -> bytes:
+        """
+        Create a Pay-to-Taproot (P2TR) script
+
+        Args:
+            x_only_pubkey: 32-byte x-only public key
+
+        Returns:
+            Script bytes: OP_1 <32 bytes>
+        """
+        if len(x_only_pubkey) != 32:
+            raise ValueError(f"P2TR requires 32-byte x-only pubkey, got {len(x_only_pubkey)} bytes")
+        # OP_1 (0x51) followed by 32-byte push
+        return bytes([0x51, 0x20]) + x_only_pubkey
+
+    @staticmethod
     def create_p2wpkh_script(witness_program: bytes) -> bytes:
         """
         Create a Pay-to-Witness-PubKey-Hash (P2WPKH) script
@@ -451,7 +467,7 @@ class BitcoinTransactionBuilder:
         fee_btc: float = 0.00001
     ) -> Tuple[BitcoinTransaction, bytes]:
         """
-        Build a Bitcoin transaction (supports P2PKH and P2WPKH addresses)
+        Build a Bitcoin transaction (supports P2PKH, P2WPKH, and P2TR addresses)
 
         Args:
             utxo_txid: Transaction ID of UTXO to spend
@@ -484,6 +500,8 @@ class BitcoinTransactionBuilder:
             recipient_script = BitcoinTransaction.create_p2wpkh_script(recipient_hash)
         elif recipient_type == 'p2pkh':
             recipient_script = BitcoinTransaction.create_p2pkh_script(recipient_hash)
+        elif recipient_type == 'p2tr':
+            recipient_script = BitcoinTransaction.create_p2tr_script(recipient_hash)
         else:
             raise ValueError(f"Unsupported recipient address type: {recipient_type}")
 
@@ -497,6 +515,8 @@ class BitcoinTransactionBuilder:
                 change_script = BitcoinTransaction.create_p2wpkh_script(sender_hash)
             elif sender_type == 'p2pkh':
                 change_script = BitcoinTransaction.create_p2pkh_script(sender_hash)
+            elif sender_type == 'p2tr':
+                change_script = BitcoinTransaction.create_p2tr_script(sender_hash)
             else:
                 raise ValueError(f"Unsupported sender address type: {sender_type}")
 
@@ -510,6 +530,15 @@ class BitcoinTransactionBuilder:
             script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
         elif sender_type == 'p2pkh':
             script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        elif sender_type == 'p2tr':
+            # P2TR uses Schnorr signatures, not ECDSA
+            # Current MPC implementation only supports ECDSA
+            raise NotImplementedError(
+                "Spending from P2TR (Taproot) addresses is not yet supported. "
+                "Taproot requires Schnorr signatures, but the current MPC protocol uses ECDSA. "
+                "You can receive TO Taproot addresses, but cannot spend FROM them yet. "
+                "Use P2PKH or P2WPKH addresses for spending."
+            )
         else:
             raise ValueError(f"Unsupported sender address type: {sender_type}")
 
