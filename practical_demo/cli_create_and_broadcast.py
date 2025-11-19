@@ -165,7 +165,8 @@ async def complete_transaction_flow(
         "utxo_vout": utxo['vout'],
         "utxo_amount": str(utxo['amount']),
         "sender_address": sender_address,
-        "address_index": address_index
+        "address_index": address_index,
+        "address_type": address_type  # Include address type for correct sighash
     }
 
     async with aiohttp.ClientSession() as session:
@@ -213,9 +214,16 @@ async def complete_transaction_flow(
     # Step 5: Broadcast the signed transaction
     print("\nStep 5: Broadcasting to Bitcoin network...")
 
+    # Get address type from database (fallback to what we computed if not stored)
+    stored_address_type = tx.get('address_type', None)
+    if stored_address_type and stored_address_type != address_type:
+        print(f"  ℹ️  Database has different address_type: {stored_address_type} vs {address_type}")
+        print(f"  ℹ️  Using database value: {stored_address_type}")
+        address_type = stored_address_type
+
     # Build transaction using the EXACT parameters that were signed
     # (from the transaction stored in database)
-    tx_builder, script_code = BitcoinTransactionBuilder.build_p2pkh_transaction(
+    tx_builder, script_code, sender_type, utxo_amount_sats = BitcoinTransactionBuilder.build_p2pkh_transaction(
         utxo_txid=tx['utxo_txid'],
         utxo_vout=tx['utxo_vout'],
         utxo_amount_btc=float(tx['utxo_amount']),
@@ -225,17 +233,32 @@ async def complete_transaction_flow(
         fee_btc=float(tx['fee'])
     )
 
-    # Verify the sighash matches
-    computed_sighash = tx_builder.get_sighash(input_index=0, script_code=script_code)
+    # Verify sender_type matches address_type
+    if sender_type != address_type:
+        print(f"  ⚠️  WARNING: sender_type mismatch! build returned '{sender_type}' but we expect '{address_type}'")
+
+    # Verify the sighash matches (use correct method for address type)
+    if sender_type == 'p2wpkh':
+        # Use BIP143 sighash for witness transactions
+        computed_sighash = tx_builder.get_sighash_bip143(
+            input_index=0,
+            script_code=script_code,
+            amount=utxo_amount_sats
+        )
+    else:
+        # Use legacy sighash for P2PKH
+        computed_sighash = tx_builder.get_sighash(input_index=0, script_code=script_code)
+
     expected_sighash = bytes.fromhex(tx['message_hash'])
 
     if computed_sighash != expected_sighash:
         print(f"❌ SIGHASH MISMATCH!")
         print(f"  Expected: {expected_sighash.hex()}")
         print(f"  Computed: {computed_sighash.hex()}")
+        print(f"  Sender type: {sender_type}")
         return False
 
-    print(f"✓ Sighash verified: {computed_sighash.hex()[:32]}...")
+    print(f"✓ Sighash verified: {computed_sighash.hex()[:32]}... (type: {sender_type})")
 
     # Add MPC signature
     # Derive the correct pubkey for the address index used
@@ -244,19 +267,83 @@ async def complete_transaction_flow(
     pubkeys = PublicKeyDerivation.derive_address_public_keys(xpub, change=0, num_addresses=address_idx + 1)
     correct_pubkey = pubkeys[address_idx]
 
+    # Verify that the derived public key matches the sender address
+    derived_sender_address = BitcoinAddressGenerator.pubkey_to_address(
+        correct_pubkey,
+        network="regtest",
+        address_type=sender_type
+    )
+
+    print(f"\n  Verifying public key...")
+    print(f"  Sender address: {tx['sender_address']}")
+    print(f"  Derived address: {derived_sender_address}")
+    print(f"  Public key: {correct_pubkey.hex()}")
+    print(f"  Address type: {sender_type}")
+
+    if derived_sender_address != tx['sender_address']:
+        print(f"\n❌ CRITICAL ERROR: Address mismatch!")
+        print(f"  Expected: {tx['sender_address']}")
+        print(f"  Derived:  {derived_sender_address}")
+        print(f"  This WILL cause signature verification to fail!")
+        return False
+
     signature = tx['final_signature']
     signature_der = bytes.fromhex(signature['der'])
 
+    # Verify the signature is valid before broadcasting
+    print(f"\n  Verifying ECDSA signature...")
+    try:
+        from guardianvault.threshold_signing import ThresholdSignature, ThresholdSigner
+        r = signature.get('r')
+        s = signature.get('s')
+
+        if r and s:
+            # r and s are stored as decimal strings, not hex
+            threshold_sig = ThresholdSignature(int(r), int(s))
+            # Verify signature against the sighash
+            is_valid = ThresholdSigner.verify_signature(correct_pubkey, computed_sighash, threshold_sig)
+            print(f"  Signature mathematically valid: {is_valid}")
+
+            if not is_valid:
+                print(f"  ❌ Signature is NOT valid for this sighash!")
+                print(f"  r: {r[:32]}...")
+                print(f"  s: {s[:32]}...")
+                print(f"  This means the MPC signing produced an incorrect signature")
+                return False
+            else:
+                print(f"  ✓ Signature is valid!")
+        else:
+            print(f"  ⚠️  Could not verify signature (r/s not in response)")
+    except Exception as e:
+        print(f"  ⚠️  Could not verify signature: {e}")
+        import traceback
+        traceback.print_exc()
+
+    # Sign with correct method for address type
     signed_tx = BitcoinTransactionBuilder.sign_transaction(
         tx_builder,
         input_index=0,
         script_code=script_code,
         signature_der=signature_der,
-        public_key=correct_pubkey
+        public_key=correct_pubkey,
+        sender_type=sender_type
     )
+
+    # Debug: Check witness data
+    print(f"\n  Checking transaction structure...")
+    print(f"  Input 0 scriptSig length: {len(signed_tx.inputs[0].script_sig)}")
+    print(f"  Input 0 witness count: {len(signed_tx.inputs[0].witness)}")
+    if len(signed_tx.inputs[0].witness) > 0:
+        print(f"  Witness[0] (signature) length: {len(signed_tx.inputs[0].witness[0])} bytes")
+        print(f"  Witness[0] first 10 bytes: {signed_tx.inputs[0].witness[0][:10].hex()}")
+        print(f"  Witness[0] last byte (sighash): {signed_tx.inputs[0].witness[0][-1]:02x}")
+        print(f"  Witness[1] (pubkey) length: {len(signed_tx.inputs[0].witness[1])} bytes")
+        print(f"  Witness[1]: {signed_tx.inputs[0].witness[1].hex()}")
 
     # Broadcast
     raw_tx_hex = signed_tx.serialize().hex()
+    print(f"\n  Transaction hex (first 100 chars): {raw_tx_hex[:100]}")
+    print(f"  Transaction size: {len(raw_tx_hex) // 2} bytes")
 
     try:
         txid = rpc.sendrawtransaction(raw_tx_hex)

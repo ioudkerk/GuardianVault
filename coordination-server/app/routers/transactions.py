@@ -38,7 +38,7 @@ def compute_message_hash(tx_create: TransactionCreate) -> str:
     if tx_create.coin_type == "bitcoin" and tx_create.utxo_txid and tx_create.sender_address:
         try:
             # Build the actual Bitcoin transaction
-            tx_builder, script_code = BitcoinTransactionBuilder.build_p2pkh_transaction(
+            tx_builder, script_code, sender_type, utxo_amount_sats = BitcoinTransactionBuilder.build_p2pkh_transaction(
                 utxo_txid=tx_create.utxo_txid,
                 utxo_vout=tx_create.utxo_vout,
                 utxo_amount_btc=float(tx_create.utxo_amount),
@@ -48,11 +48,25 @@ def compute_message_hash(tx_create: TransactionCreate) -> str:
                 fee_btc=float(tx_create.fee or "0.0001")
             )
 
-            # Compute the sighash
-            sighash = tx_builder.get_sighash(input_index=0, script_code=script_code)
+            # Compute the sighash using the correct method for address type
+            if sender_type == 'p2wpkh':
+                # Use BIP143 sighash for witness transactions
+                sighash = tx_builder.get_sighash_bip143(
+                    input_index=0,
+                    script_code=script_code,
+                    amount=utxo_amount_sats
+                )
+                logger.info(f"Computing BIP143 sighash for P2WPKH transaction")
+            else:
+                # Use legacy sighash for P2PKH
+                sighash = tx_builder.get_sighash(input_index=0, script_code=script_code)
+                logger.info(f"Computing legacy sighash for P2PKH transaction")
+
             return sighash.hex()
         except Exception as e:
             logger.error(f"Failed to compute Bitcoin sighash: {e}")
+            import traceback
+            traceback.print_exc()
             # Fall back to simple hash
             pass
 
@@ -115,6 +129,7 @@ async def create_transaction(tx_create: TransactionCreate):
         utxo_amount=tx_create.utxo_amount,
         sender_address=tx_create.sender_address,
         address_index=tx_create.address_index,
+        address_type=tx_create.address_type,  # IMPORTANT: Must match for correct sighash
         message_hash=message_hash,
         status=TransactionStatus.PENDING,
         signatures_required=vault.threshold,

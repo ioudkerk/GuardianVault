@@ -35,6 +35,7 @@ class TransactionCreate(BaseModel):
     utxo_amount: Optional[str] = None  # UTXO amount
     sender_address: Optional[str] = None  # Sender address (for script)
     address_index: Optional[int] = 0  # Address derivation index
+    address_type: Optional[str] = "p2pkh"  # Address type: p2pkh, p2wpkh, or p2tr
 
     class Config:
         json_schema_extra = {
@@ -82,6 +83,7 @@ class Transaction(BaseModel):
     utxo_amount: Optional[str] = None
     sender_address: Optional[str] = None
     address_index: Optional[int] = 0
+    address_type: Optional[str] = "p2pkh"
 
     # Message to sign (transaction hash)
     message_hash: str
