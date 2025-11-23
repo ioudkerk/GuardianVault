@@ -70,7 +70,12 @@ def compute_message_hash(tx_create: TransactionCreate) -> str:
             # Fall back to simple hash
             pass
 
-    # Fallback: simple hash for Ethereum or if Bitcoin UTXO details missing
+    # For Ethereum, use the provided message_hash if available
+    if tx_create.coin_type == "ethereum" and tx_create.message_hash:
+        logger.info(f"Using provided Ethereum transaction hash: {tx_create.message_hash[:32]}...")
+        return tx_create.message_hash
+
+    # Fallback: simple hash for legacy/testing purposes
     data_str = f"{tx_create.amount}{tx_create.recipient}{tx_create.vault_id}"
     return hashlib.sha256(data_str.encode()).hexdigest()
 

@@ -47,6 +47,14 @@ class GuardianClient:
         else:
             raise ValueError("Share file missing 'bitcoin_account_share' or 'share' field")
 
+        # Load Ethereum account share (m/44'/60'/0') if available
+        if 'ethereum_account_share' in self.share_data:
+            self.ethereum_account_share = KeyShare.from_dict(self.share_data['ethereum_account_share'])
+        else:
+            # If no Ethereum share, we can't sign Ethereum transactions
+            print("⚠️  WARNING: No ethereum_account_share found. Ethereum transactions will not work!")
+            self.ethereum_account_share = None
+
         # Load vault config for xpub
         self.vault_config = None
         if vault_config:
@@ -274,29 +282,43 @@ class GuardianClient:
             print(f"    r: {hex(r)[:32]}...")
             print(f"    message_hash: {message_hash_hex[:32]}...")
 
-            # Derive Bitcoin address-level share for signing
-            # Bitcoin transactions must be signed with address-level shares (m/44'/0'/0'/0/address_index)
-            # We already have the account share (m/44'/0'/0'), now derive non-hardened children
+            # Derive address-level share for signing
+            # Both Bitcoin and Ethereum transactions must be signed with address-level shares
+            # Bitcoin: m/44'/0'/0'/0/address_index
+            # Ethereum: m/44'/60'/0'/0/address_index
             if self.vault_config:
-                # Get address index from transaction (need to fetch full transaction)
+                # Get address index and coin type from transaction
                 try:
                     async with aiohttp.ClientSession() as session:
                         async with session.get(f"{self.server_url}/api/transactions/{transaction_id}") as resp:
                             tx_response = await resp.json()
 
                     address_index = tx_response.get('address_index', 0)
+                    coin_type = tx_response.get('coin_type', 'bitcoin')
+                    print(f"  ✓ Coin type: {coin_type}")
                     print(f"  ✓ Address index: {address_index}")
 
-                    # Get account xpub from vault config (m/44'/0'/0')
-                    account_xpub = ExtendedPublicKey.from_dict(self.vault_config['bitcoin']['xpub'])
+                    # Choose the correct account share and xpub based on coin type
+                    if coin_type == 'ethereum':
+                        # Use Ethereum account share (m/44'/60'/0')
+                        if self.ethereum_account_share is None:
+                            raise ValueError("No Ethereum account share available! Guardian was not registered with Ethereum support.")
+                        account_share = self.ethereum_account_share
+                        account_xpub = ExtendedPublicKey.from_dict(self.vault_config['ethereum']['xpub'])
+                        path_prefix = "m/44'/60'/0'/0"
+                    else:
+                        # Use Bitcoin account share (m/44'/0'/0')
+                        account_share = self.bitcoin_account_share
+                        account_xpub = ExtendedPublicKey.from_dict(self.vault_config['bitcoin']['xpub'])
+                        path_prefix = "m/44'/0'/0'/0"
 
-                    # Derive change-level share (m/44'/0'/0'/0) - non-hardened
+                    # Derive change-level share (m/44'/coin_type'/0'/0) - non-hardened
                     change_pubkey, change_chain = PublicKeyDerivation.derive_public_child(account_xpub, 0)
                     change_share = self._derive_non_hardened_child_share(
-                        self.bitcoin_account_share, account_xpub.public_key, account_xpub.chain_code, 0
+                        account_share, account_xpub.public_key, account_xpub.chain_code, 0
                     )
 
-                    # Derive address-level share (m/44'/0'/0'/0/address_index) - non-hardened
+                    # Derive address-level share (m/44'/coin_type'/0'/0/address_index) - non-hardened
                     address_pubkey, _ = PublicKeyDerivation.derive_public_child(
                         ExtendedPublicKey(change_pubkey, change_chain, account_xpub.depth + 1, b'\x00'*4, 0),
                         address_index
@@ -305,7 +327,7 @@ class GuardianClient:
                         change_share, change_pubkey, change_chain, address_index
                     )
 
-                    print(f"  ✓ Derived address-level share for signing (m/44'/0'/0'/0/{address_index})")
+                    print(f"  ✓ Derived address-level share for signing ({path_prefix}/{address_index})")
                     signing_share = address_share
 
                 except Exception as e:

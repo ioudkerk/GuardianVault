@@ -36,6 +36,14 @@ class TransactionCreate(BaseModel):
     sender_address: Optional[str] = None  # Sender address (for script)
     address_index: Optional[int] = 0  # Address derivation index
     address_type: Optional[str] = "p2pkh"  # Address type: p2pkh, p2wpkh, or p2tr
+    # Ethereum-specific fields
+    message_hash: Optional[str] = None  # Pre-computed transaction hash for Ethereum
+    nonce: Optional[int] = None  # Ethereum account nonce
+    chain_id: Optional[int] = None  # Ethereum chain ID
+    max_priority_fee_per_gas: Optional[int] = None  # EIP-1559 priority fee
+    max_fee_per_gas: Optional[int] = None  # EIP-1559 max fee
+    gas_limit: Optional[int] = None  # Gas limit
+    tx_data: Optional[str] = None  # Contract call data (hex)
 
     class Config:
         json_schema_extra = {

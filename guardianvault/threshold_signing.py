@@ -237,6 +237,89 @@ class ThresholdSigner:
         # Verify: r == P.x mod n
         return r == (P.x % SECP256K1_N)
 
+    @staticmethod
+    def recover_ethereum_v(
+        public_key: bytes,
+        message_hash: bytes,
+        signature: ThresholdSignature
+    ) -> int:
+        """
+        Recover the v parameter (recovery ID) for Ethereum signatures.
+
+        Ethereum needs the recovery ID to recover the public key from a signature.
+        This tries both possible values (0 and 1) and returns the correct one.
+
+        Args:
+            public_key: 33 or 65-byte public key
+            message_hash: 32-byte message hash that was signed
+            signature: The signature (r, s)
+
+        Returns:
+            Recovery ID (0 or 1)
+
+        Raises:
+            ValueError: If recovery fails
+        """
+        # Convert public key to EllipticCurvePoint for comparison
+        if len(public_key) == 33:
+            # Already compressed
+            expected_point = EllipticCurvePoint.from_bytes(public_key)
+        else:
+            # Uncompressed (65 bytes: 0x04 || x || y)
+            x = int.from_bytes(public_key[1:33], 'big')
+            y = int.from_bytes(public_key[33:65], 'big')
+            expected_point = EllipticCurvePoint(x, y)
+
+        # Parse signature and message hash
+        r = signature.r
+        s = signature.s
+        z = int.from_bytes(message_hash, 'big')
+
+        # Try both recovery IDs (0 and 1)
+        for v in [0, 1]:
+            try:
+                # Calculate the point R from r
+                # There are two possible y values for a given x (r)
+                # v tells us which one to use
+
+                # Find y coordinate for R
+                # Solve: y^2 = x^3 + 7 (mod p) for secp256k1
+                from .threshold_mpc_keymanager import SECP256K1_P
+
+                x_coord = r
+                y_squared = (pow(x_coord, 3, SECP256K1_P) + 7) % SECP256K1_P
+
+                # Compute square root using Tonelli-Shanks (p ≡ 3 mod 4 for secp256k1)
+                y_coord = pow(y_squared, (SECP256K1_P + 1) // 4, SECP256K1_P)
+
+                # Choose y based on v (even/odd)
+                if (y_coord % 2 == 0) != (v == 0):
+                    y_coord = SECP256K1_P - y_coord
+
+                R = EllipticCurvePoint(x_coord, y_coord)
+
+                # Recover public key: Q = r^(-1) * (s*R - z*G)
+                r_inv = pow(r, -1, SECP256K1_N)
+
+                G = EllipticCurvePoint.generator()
+                s_R = R * s
+                z_G = G * z
+
+                # s*R - z*G
+                Q = s_R + (EllipticCurvePoint(z_G.x, SECP256K1_P - z_G.y) if not z_G.is_infinity else EllipticCurvePoint.infinity())
+
+                # Q * r^(-1)
+                Q = Q * r_inv
+
+                # Check if recovered key matches expected key
+                if Q.x == expected_point.x and Q.y == expected_point.y:
+                    return v
+
+            except Exception:
+                continue
+
+        raise ValueError("Could not recover v parameter from signature")
+
 
 class ThresholdSigningWorkflow:
     """Complete threshold signing workflow (simulating async communication)"""
