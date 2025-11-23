@@ -94,6 +94,9 @@ socket_app = socketio.ASGIApp(
     other_asgi_app=app,
 )
 
+# Inject Socket.IO server into routers for WebSocket notifications
+transactions.sio = sio
+
 
 # ==============================================================================
 # Socket.IO Event Handlers

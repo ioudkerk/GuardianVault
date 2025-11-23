@@ -29,6 +29,21 @@ class TransactionCreate(BaseModel):
     recipient: str
     fee: Optional[str] = None
     memo: Optional[str] = None
+    # Bitcoin-specific fields for computing proper sighash
+    utxo_txid: Optional[str] = None  # UTXO transaction ID to spend
+    utxo_vout: Optional[int] = None  # UTXO output index
+    utxo_amount: Optional[str] = None  # UTXO amount
+    sender_address: Optional[str] = None  # Sender address (for script)
+    address_index: Optional[int] = 0  # Address derivation index
+    address_type: Optional[str] = "p2pkh"  # Address type: p2pkh, p2wpkh, or p2tr
+    # Ethereum-specific fields
+    message_hash: Optional[str] = None  # Pre-computed transaction hash for Ethereum
+    nonce: Optional[int] = None  # Ethereum account nonce
+    chain_id: Optional[int] = None  # Ethereum chain ID
+    max_priority_fee_per_gas: Optional[int] = None  # EIP-1559 priority fee
+    max_fee_per_gas: Optional[int] = None  # EIP-1559 max fee
+    gas_limit: Optional[int] = None  # Gas limit
+    tx_data: Optional[str] = None  # Contract call data (hex)
 
     class Config:
         json_schema_extra = {
@@ -39,7 +54,12 @@ class TransactionCreate(BaseModel):
                 "amount": "0.5",
                 "recipient": "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
                 "fee": "0.0001",
-                "memo": "Payment for services"
+                "memo": "Payment for services",
+                "utxo_txid": "abc...123",
+                "utxo_vout": 0,
+                "utxo_amount": "1.0",
+                "sender_address": "1sender...",
+                "address_index": 0
             }
         }
 
@@ -64,6 +84,14 @@ class Transaction(BaseModel):
     recipient: str
     fee: Optional[str] = None
     memo: Optional[str] = None
+
+    # Bitcoin-specific transaction details (for reconstruction)
+    utxo_txid: Optional[str] = None
+    utxo_vout: Optional[int] = None
+    utxo_amount: Optional[str] = None
+    sender_address: Optional[str] = None
+    address_index: Optional[int] = 0
+    address_type: Optional[str] = "p2pkh"
 
     # Message to sign (transaction hash)
     message_hash: str

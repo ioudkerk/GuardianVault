@@ -91,7 +91,8 @@ def register_handlers(sio):
             "data": {
                 "kTotal": number,
                 "r": number,
-                "numParties": number
+                "numParties": number,
+                "messageHash": string
             }
         }
         """
@@ -124,6 +125,7 @@ def register_handlers(sio):
                         "kTotal": data_dict["k_total"],
                         "r": data_dict["r"],
                         "numParties": data_dict["num_parties"],
+                        "messageHash": data_dict["message_hash"],
                     },
                 }
             else:

@@ -7,7 +7,141 @@ Constructs and signs Bitcoin transactions compatible with MPC threshold signing
 import hashlib
 import struct
 from typing import List, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+class Bech32:
+    """Bech32/Bech32m encoding/decoding for SegWit addresses"""
+
+    CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    GENERATOR = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+    BECH32_CONST = 1
+    BECH32M_CONST = 0x2bc830a3
+
+    @classmethod
+    def bech32_polymod(cls, values):
+        """Compute Bech32 checksum"""
+        gen = cls.GENERATOR
+        chk = 1
+        for value in values:
+            b = chk >> 25
+            chk = (chk & 0x1ffffff) << 5 ^ value
+            for i in range(5):
+                chk ^= gen[i] if ((b >> i) & 1) else 0
+        return chk
+
+    @classmethod
+    def bech32_hrp_expand(cls, hrp):
+        """Expand human-readable part for checksum"""
+        return [ord(x) >> 5 for x in hrp] + [0] + [ord(x) & 31 for x in hrp]
+
+    @classmethod
+    def bech32_verify_checksum(cls, hrp, data, const):
+        """Verify Bech32/Bech32m checksum"""
+        return cls.bech32_polymod(cls.bech32_hrp_expand(hrp) + data) == const
+
+    @classmethod
+    def bech32_create_checksum(cls, hrp, data, const):
+        """Create Bech32/Bech32m checksum"""
+        values = cls.bech32_hrp_expand(hrp) + data
+        polymod = cls.bech32_polymod(values + [0, 0, 0, 0, 0, 0]) ^ const
+        return [(polymod >> 5 * (5 - i)) & 31 for i in range(6)]
+
+    @classmethod
+    def bech32_encode(cls, hrp, data, const):
+        """Encode Bech32/Bech32m string"""
+        combined = data + cls.bech32_create_checksum(hrp, data, const)
+        return hrp + '1' + ''.join([cls.CHARSET[d] for d in combined])
+
+    @classmethod
+    def bech32_decode(cls, bech):
+        """Decode a Bech32/Bech32m string - returns (hrp, data, encoding)"""
+        if ((any(ord(x) < 33 or ord(x) > 126 for x in bech)) or
+                (bech.lower() != bech and bech.upper() != bech)):
+            return (None, None, None)
+        bech = bech.lower()
+        pos = bech.rfind('1')
+        if pos < 1 or pos + 7 > len(bech) or len(bech) > 90:
+            return (None, None, None)
+        if not all(x in cls.CHARSET for x in bech[pos+1:]):
+            return (None, None, None)
+        hrp = bech[:pos]
+        data = [cls.CHARSET.find(x) for x in bech[pos+1:]]
+
+        # Try Bech32 first, then Bech32m
+        encoding = None
+        if cls.bech32_verify_checksum(hrp, data, cls.BECH32_CONST):
+            encoding = 'bech32'
+        elif cls.bech32_verify_checksum(hrp, data, cls.BECH32M_CONST):
+            encoding = 'bech32m'
+        else:
+            return (None, None, None)
+
+        return (hrp, data[:-6], encoding)
+
+    @classmethod
+    def convertbits(cls, data, frombits, tobits, pad=True):
+        """Convert between bit groups"""
+        acc = 0
+        bits = 0
+        ret = []
+        maxv = (1 << tobits) - 1
+        max_acc = (1 << (frombits + tobits - 1)) - 1
+        for value in data:
+            if value < 0 or (value >> frombits):
+                return None
+            acc = ((acc << frombits) | value) & max_acc
+            bits += frombits
+            while bits >= tobits:
+                bits -= tobits
+                ret.append((acc >> bits) & maxv)
+        if pad:
+            if bits:
+                ret.append((acc << (tobits - bits)) & maxv)
+        elif bits >= frombits or ((acc << (tobits - bits)) & maxv):
+            return None
+        return ret
+
+    @classmethod
+    def decode_segwit_address(cls, hrp, addr):
+        """Decode a SegWit address (v0-v16)"""
+        hrpgot, data, encoding = cls.bech32_decode(addr)
+        if hrpgot != hrp:
+            return (None, None)
+        decoded = cls.convertbits(data[1:], 5, 8, False)
+        if decoded is None or len(decoded) < 2 or len(decoded) > 40:
+            return (None, None)
+        if data[0] > 16:
+            return (None, None)
+
+        # Witness v0 uses bech32, v1+ use bech32m
+        if data[0] == 0:
+            if encoding != 'bech32':
+                return (None, None)
+            if len(decoded) != 20 and len(decoded) != 32:
+                return (None, None)
+        else:
+            if encoding != 'bech32m':
+                return (None, None)
+            # Taproot (v1) requires 32 bytes
+            if data[0] == 1 and len(decoded) != 32:
+                return (None, None)
+
+        return (data[0], decoded)
+
+    @classmethod
+    def encode_segwit_address(cls, hrp, witver, witprog):
+        """Encode a SegWit address"""
+        # Witness v0 uses bech32, v1+ use bech32m
+        const = cls.BECH32_CONST if witver == 0 else cls.BECH32M_CONST
+
+        # Convert witness program to 5-bit groups
+        data = cls.convertbits(witprog, 8, 5)
+        if data is None:
+            return None
+
+        # Encode with witness version
+        return cls.bech32_encode(hrp, [witver] + data, const)
 
 
 @dataclass
@@ -17,6 +151,7 @@ class TxInput:
     vout: int  # Output index
     script_sig: bytes = b''  # Signature script (empty for unsigned)
     sequence: int = 0xffffffff  # Sequence number
+    witness: List[bytes] = field(default_factory=list)  # Witness data (for SegWit transactions)
 
 
 @dataclass
@@ -72,25 +207,101 @@ class BitcoinTransaction:
         return bytes([0x76, 0xa9, 0x14]) + address_hash + bytes([0x88, 0xac])
 
     @staticmethod
-    def decode_address_to_hash(address: str) -> bytes:
+    def create_p2tr_script(x_only_pubkey: bytes) -> bytes:
         """
-        Decode a Bitcoin address to get the 20-byte hash
+        Create a Pay-to-Taproot (P2TR) script
 
         Args:
-            address: Bitcoin address (base58)
+            x_only_pubkey: 32-byte x-only public key
 
         Returns:
-            20-byte hash
+            Script bytes: OP_1 <32 bytes>
         """
-        import base58
+        if len(x_only_pubkey) != 32:
+            raise ValueError(f"P2TR requires 32-byte x-only pubkey, got {len(x_only_pubkey)} bytes")
+        # OP_1 (0x51) followed by 32-byte push
+        return bytes([0x51, 0x20]) + x_only_pubkey
 
-        # Decode base58
-        decoded = base58.b58decode(address)
+    @staticmethod
+    def create_p2wpkh_script(witness_program: bytes) -> bytes:
+        """
+        Create a Pay-to-Witness-PubKey-Hash (P2WPKH) script
 
-        # Remove version byte (first) and checksum (last 4 bytes)
-        address_hash = decoded[1:-4]
+        Args:
+            witness_program: 20-byte hash160(pubkey)
 
-        return address_hash
+        Returns:
+            Script bytes: OP_0 <20 bytes>
+        """
+        # OP_0 (0x00) <length> <witness_program>
+        return bytes([0x00, 0x14]) + witness_program
+
+    @staticmethod
+    def decode_address_to_hash(address: str) -> Tuple[bytes, str]:
+        """
+        Decode a Bitcoin address to get the hash and address type
+
+        Args:
+            address: Bitcoin address (base58, bech32, or bech32m)
+
+        Returns:
+            Tuple of (hash bytes, address_type)
+            - For P2PKH: (20-byte hash, 'p2pkh')
+            - For P2WPKH: (20-byte hash, 'p2wpkh')
+            - For P2WSH: (32-byte hash, 'p2wsh')
+            - For P2TR: (32-byte x-only pubkey, 'p2tr')
+        """
+        # Check if bech32/bech32m (SegWit native)
+        if address.startswith('bc1') or address.startswith('tb1') or address.startswith('bcrt1'):
+            # Bech32 or Bech32m address (P2WPKH, P2WSH, or P2TR)
+            # Determine HRP (human-readable part)
+            if address.startswith('bc1'):
+                hrp = 'bc'
+            elif address.startswith('tb1'):
+                hrp = 'tb'
+            elif address.startswith('bcrt1'):
+                hrp = 'bcrt'
+            else:
+                raise ValueError(f"Unknown bech32 prefix: {address[:4]}")
+
+            # Decode bech32/bech32m
+            witver, witprog = Bech32.decode_segwit_address(hrp, address)
+
+            if witver is None:
+                raise ValueError(f"Invalid bech32/bech32m address: {address}")
+
+            if witver == 0 and len(witprog) == 20:
+                # P2WPKH (witness version 0, 20 bytes) - bech32
+                return (bytes(witprog), 'p2wpkh')
+            elif witver == 0 and len(witprog) == 32:
+                # P2WSH (witness version 0, 32 bytes) - bech32
+                return (bytes(witprog), 'p2wsh')
+            elif witver == 1 and len(witprog) == 32:
+                # P2TR (witness version 1, 32 bytes) - bech32m (Taproot)
+                return (bytes(witprog), 'p2tr')
+            else:
+                raise ValueError(f"Unsupported witness version or program length: v{witver}, {len(witprog)} bytes")
+        else:
+            # Base58 address (P2PKH or P2SH)
+            import base58
+
+            # Decode base58
+            decoded = base58.b58decode(address)
+
+            # Remove version byte (first) and checksum (last 4 bytes)
+            address_hash = decoded[1:-4]
+
+            # Check version byte to determine type
+            version = decoded[0]
+
+            # P2PKH: mainnet=0x00, testnet=0x6f, regtest=0x6f
+            # P2SH: mainnet=0x05, testnet=0xc4, regtest=0xc4
+            if version in [0x00, 0x6f]:
+                return (address_hash, 'p2pkh')
+            elif version in [0x05, 0xc4]:
+                return (address_hash, 'p2sh')
+            else:
+                raise ValueError(f"Unknown address version byte: {hex(version)}")
 
     def serialize_for_signing(self, input_index: int, script_code: bytes, sighash_type: int = 1) -> bytes:
         """
@@ -147,9 +358,81 @@ class BitcoinTransaction:
 
         return result
 
+    def get_sighash_bip143(
+        self,
+        input_index: int,
+        script_code: bytes,
+        amount: int,
+        sighash_type: int = 1
+    ) -> bytes:
+        """
+        Get BIP143 signature hash for witness transactions (P2WPKH)
+
+        Args:
+            input_index: Index of input to sign
+            script_code: Script code (for P2WPKH, this is the P2PKH equivalent)
+            amount: Amount of the UTXO being spent (in satoshis)
+            sighash_type: Signature hash type (1 = SIGHASH_ALL)
+
+        Returns:
+            32-byte hash to sign
+        """
+        result = b''
+
+        # 1. nVersion (4 bytes)
+        result += struct.pack('<I', self.version)
+
+        # 2. hashPrevouts (32 bytes)
+        prevouts = b''
+        for tx_input in self.inputs:
+            prevouts += bytes.fromhex(tx_input.txid)[::-1]
+            prevouts += struct.pack('<I', tx_input.vout)
+        hash_prevouts = hashlib.sha256(hashlib.sha256(prevouts).digest()).digest()
+        result += hash_prevouts
+
+        # 3. hashSequence (32 bytes)
+        sequences = b''
+        for tx_input in self.inputs:
+            sequences += struct.pack('<I', tx_input.sequence)
+        hash_sequence = hashlib.sha256(hashlib.sha256(sequences).digest()).digest()
+        result += hash_sequence
+
+        # 4. outpoint (32 byte hash + 4 byte index)
+        tx_input = self.inputs[input_index]
+        result += bytes.fromhex(tx_input.txid)[::-1]
+        result += struct.pack('<I', tx_input.vout)
+
+        # 5. scriptCode
+        result += self._encode_varint(len(script_code))
+        result += script_code
+
+        # 6. amount (8 bytes)
+        result += struct.pack('<Q', amount)
+
+        # 7. nSequence (4 bytes)
+        result += struct.pack('<I', tx_input.sequence)
+
+        # 8. hashOutputs (32 bytes)
+        outputs = b''
+        for output in self.outputs:
+            outputs += struct.pack('<Q', output.amount)
+            outputs += self._encode_varint(len(output.script_pubkey))
+            outputs += output.script_pubkey
+        hash_outputs = hashlib.sha256(hashlib.sha256(outputs).digest()).digest()
+        result += hash_outputs
+
+        # 9. nLocktime (4 bytes)
+        result += struct.pack('<I', self.locktime)
+
+        # 10. sighash type (4 bytes)
+        result += struct.pack('<I', sighash_type)
+
+        # BIP143 uses single SHA256
+        return hashlib.sha256(result).digest()
+
     def get_sighash(self, input_index: int, script_code: bytes, sighash_type: int = 1) -> bytes:
         """
-        Get the signature hash for an input
+        Get the signature hash for an input (legacy P2PKH method)
 
         Args:
             input_index: Index of input to sign
@@ -188,9 +471,26 @@ class BitcoinTransaction:
 
         return script_sig
 
+    def has_witness(self) -> bool:
+        """Check if transaction has witness data"""
+        return any(len(tx_input.witness) > 0 for tx_input in self.inputs)
+
     def serialize(self) -> bytes:
         """
         Serialize the complete signed transaction
+        Automatically uses witness format if witness data is present
+
+        Returns:
+            Raw transaction bytes
+        """
+        if self.has_witness():
+            return self.serialize_witness()
+        else:
+            return self.serialize_legacy()
+
+    def serialize_legacy(self) -> bytes:
+        """
+        Serialize transaction in legacy (non-witness) format
 
         Returns:
             Raw transaction bytes
@@ -230,6 +530,60 @@ class BitcoinTransaction:
 
         return result
 
+    def serialize_witness(self) -> bytes:
+        """
+        Serialize transaction in witness format (BIP 141)
+
+        Returns:
+            Raw transaction bytes with witness data
+        """
+        result = b''
+
+        # Version
+        result += struct.pack('<I', self.version)
+
+        # Marker and flag (witness format indicator)
+        result += b'\x00\x01'
+
+        # Number of inputs
+        result += self._encode_varint(len(self.inputs))
+
+        # Inputs (without witness data)
+        for tx_input in self.inputs:
+            # Previous output (txid + vout)
+            result += bytes.fromhex(tx_input.txid)[::-1]  # Reverse byte order
+            result += struct.pack('<I', tx_input.vout)
+
+            # Script sig (empty for witness inputs)
+            result += self._encode_varint(len(tx_input.script_sig))
+            result += tx_input.script_sig
+
+            # Sequence
+            result += struct.pack('<I', tx_input.sequence)
+
+        # Number of outputs
+        result += self._encode_varint(len(self.outputs))
+
+        # Outputs
+        for output in self.outputs:
+            result += struct.pack('<Q', output.amount)
+            result += self._encode_varint(len(output.script_pubkey))
+            result += output.script_pubkey
+
+        # Witness data for each input
+        for tx_input in self.inputs:
+            # Number of witness items
+            result += self._encode_varint(len(tx_input.witness))
+            # Each witness item
+            for witness_item in tx_input.witness:
+                result += self._encode_varint(len(witness_item))
+                result += witness_item
+
+        # Locktime
+        result += struct.pack('<I', self.locktime)
+
+        return result
+
     @staticmethod
     def _encode_varint(n: int) -> bytes:
         """Encode an integer as a Bitcoin variable-length integer"""
@@ -255,9 +609,9 @@ class BitcoinTransactionBuilder:
         recipient_address: str,
         send_amount_btc: float,
         fee_btc: float = 0.00001
-    ) -> Tuple[BitcoinTransaction, bytes]:
+    ) -> Tuple[BitcoinTransaction, bytes, str, int]:
         """
-        Build a P2PKH transaction
+        Build a Bitcoin transaction (supports P2PKH, P2WPKH, and P2TR addresses)
 
         Args:
             utxo_txid: Transaction ID of UTXO to spend
@@ -269,7 +623,7 @@ class BitcoinTransactionBuilder:
             fee_btc: Transaction fee (BTC)
 
         Returns:
-            Tuple of (transaction, script_code_for_signing)
+            Tuple of (transaction, script_code_for_signing, sender_type, utxo_amount_satoshis)
         """
         # Calculate change
         change_amount_btc = utxo_amount_btc - send_amount_btc - fee_btc
@@ -284,21 +638,58 @@ class BitcoinTransactionBuilder:
         tx.add_input(utxo_txid, utxo_vout)
 
         # Add output to recipient
-        recipient_hash = BitcoinTransaction.decode_address_to_hash(recipient_address)
-        recipient_script = BitcoinTransaction.create_p2pkh_script(recipient_hash)
+        recipient_hash, recipient_type = BitcoinTransaction.decode_address_to_hash(recipient_address)
+
+        if recipient_type == 'p2wpkh':
+            recipient_script = BitcoinTransaction.create_p2wpkh_script(recipient_hash)
+        elif recipient_type == 'p2pkh':
+            recipient_script = BitcoinTransaction.create_p2pkh_script(recipient_hash)
+        elif recipient_type == 'p2tr':
+            recipient_script = BitcoinTransaction.create_p2tr_script(recipient_hash)
+        else:
+            raise ValueError(f"Unsupported recipient address type: {recipient_type}")
+
         tx.add_output(send_amount_btc, recipient_script)
 
         # Add change output if significant (dust threshold = 0.00001 BTC)
         if change_amount_btc >= 0.00001:
-            sender_hash = BitcoinTransaction.decode_address_to_hash(sender_address)
-            change_script = BitcoinTransaction.create_p2pkh_script(sender_hash)
+            sender_hash, sender_type = BitcoinTransaction.decode_address_to_hash(sender_address)
+
+            if sender_type == 'p2wpkh':
+                change_script = BitcoinTransaction.create_p2wpkh_script(sender_hash)
+            elif sender_type == 'p2pkh':
+                change_script = BitcoinTransaction.create_p2pkh_script(sender_hash)
+            elif sender_type == 'p2tr':
+                change_script = BitcoinTransaction.create_p2tr_script(sender_hash)
+            else:
+                raise ValueError(f"Unsupported sender address type: {sender_type}")
+
             tx.add_output(change_amount_btc, change_script)
 
         # Create script_code for signing (the scriptPubKey of the output being spent)
-        sender_hash = BitcoinTransaction.decode_address_to_hash(sender_address)
-        script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        sender_hash, sender_type = BitcoinTransaction.decode_address_to_hash(sender_address)
 
-        return tx, script_code
+        if sender_type == 'p2wpkh':
+            # For P2WPKH, script_code is P2PKH of the same hash
+            script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        elif sender_type == 'p2pkh':
+            script_code = BitcoinTransaction.create_p2pkh_script(sender_hash)
+        elif sender_type == 'p2tr':
+            # P2TR uses Schnorr signatures, not ECDSA
+            # Current MPC implementation only supports ECDSA
+            raise NotImplementedError(
+                "Spending from P2TR (Taproot) addresses is not yet supported. "
+                "Taproot requires Schnorr signatures, but the current MPC protocol uses ECDSA. "
+                "You can receive TO Taproot addresses, but cannot spend FROM them yet. "
+                "Use P2PKH or P2WPKH addresses for spending."
+            )
+        else:
+            raise ValueError(f"Unsupported sender address type: {sender_type}")
+
+        # Convert amount to satoshis
+        utxo_amount_satoshis = int(utxo_amount_btc * 100_000_000)
+
+        return tx, script_code, sender_type, utxo_amount_satoshis
 
     @staticmethod
     def sign_transaction(
@@ -306,10 +697,11 @@ class BitcoinTransactionBuilder:
         input_index: int,
         script_code: bytes,
         signature_der: bytes,
-        public_key: bytes
+        public_key: bytes,
+        sender_type: str = 'p2pkh'
     ) -> BitcoinTransaction:
         """
-        Add signature to transaction input
+        Add signature to transaction input (supports P2PKH and P2WPKH)
 
         Args:
             tx: Transaction to sign
@@ -317,15 +709,22 @@ class BitcoinTransactionBuilder:
             script_code: Script code used for signing
             signature_der: DER-encoded signature
             public_key: Public key (33 bytes compressed)
+            sender_type: Type of sender address ('p2pkh' or 'p2wpkh')
 
         Returns:
             Signed transaction
         """
-        # Create scriptSig
-        script_sig = BitcoinTransaction.create_script_sig(signature_der, public_key)
-
-        # Set the scriptSig for the input
-        tx.set_input_script_sig(input_index, script_sig)
+        if sender_type == 'p2pkh':
+            # P2PKH: signature goes in scriptSig
+            script_sig = BitcoinTransaction.create_script_sig(signature_der, public_key)
+            tx.set_input_script_sig(input_index, script_sig)
+        elif sender_type == 'p2wpkh':
+            # P2WPKH: signature goes in witness, scriptSig is empty
+            sig_with_sighash = signature_der + bytes([0x01])  # SIGHASH_ALL
+            tx.inputs[input_index].witness = [sig_with_sighash, public_key]
+            tx.inputs[input_index].script_sig = b''  # scriptSig must be empty
+        else:
+            raise ValueError(f"Unsupported sender_type for signing: {sender_type}")
 
         return tx
 

@@ -17,27 +17,44 @@ class BitcoinAddressGenerator:
     """Generate Bitcoin addresses from public keys (no private key needed!)"""
 
     @staticmethod
-    def pubkey_to_address(public_key: bytes, network: str = "mainnet") -> str:
+    def pubkey_to_address(public_key: bytes, network: str = "mainnet", address_type: str = "p2pkh") -> str:
         """
-        Convert public key to Bitcoin P2PKH address
+        Convert public key to Bitcoin address
 
         Args:
             public_key: 33-byte compressed public key
-            network: Network type - "mainnet", "testnet", or "regtest"
-                    (default: "mainnet")
+            network: Network type - "mainnet", "testnet", or "regtest" (default: "mainnet")
+            address_type: Address type - "p2pkh" (legacy), "p2wpkh" (segwit), or "p2tr" (taproot)
+                         (default: "p2pkh")
 
         Returns:
-            Bitcoin address string (e.g., "1A1zP1..." for mainnet, "m..." or "n..." for testnet/regtest)
+            Bitcoin address string:
+            - P2PKH: "1..." (mainnet), "m/n..." (testnet/regtest)
+            - P2WPKH: "bc1q..." (mainnet), "tb1q..." (testnet), "bcrt1q..." (regtest)
+            - P2TR: "bc1p..." (mainnet), "tb1p..." (testnet), "bcrt1p..." (regtest)
 
         Note:
-            - Mainnet uses version byte 0x00 (addresses start with "1")
-            - Testnet uses version byte 0x6f (addresses start with "m" or "n")
-            - Regtest uses version byte 0x6f (same as testnet)
+            - P2PKH: Legacy addresses (base58)
+            - P2WPKH: SegWit v0 addresses (bech32)
+            - P2TR: Taproot addresses (bech32m)
         """
-        # Validate network parameter
+        # Validate parameters
         if network not in ["mainnet", "testnet", "regtest"]:
             raise ValueError(f"Invalid network '{network}'. Must be 'mainnet', 'testnet', or 'regtest'")
 
+        if address_type not in ["p2pkh", "p2wpkh", "p2tr"]:
+            raise ValueError(f"Invalid address_type '{address_type}'. Must be 'p2pkh', 'p2wpkh', or 'p2tr'")
+
+        if address_type == "p2pkh":
+            return BitcoinAddressGenerator._pubkey_to_p2pkh(public_key, network)
+        elif address_type == "p2wpkh":
+            return BitcoinAddressGenerator._pubkey_to_p2wpkh(public_key, network)
+        elif address_type == "p2tr":
+            return BitcoinAddressGenerator._pubkey_to_p2tr(public_key, network)
+
+    @staticmethod
+    def _pubkey_to_p2pkh(public_key: bytes, network: str) -> str:
+        """Convert public key to P2PKH address (legacy)"""
         # Hash the public key: SHA256 then RIPEMD160
         sha256_hash = hashlib.sha256(public_key).digest()
 
@@ -55,9 +72,53 @@ class BitcoinAddressGenerator:
 
         # Concatenate and encode to Base58
         address_bytes = versioned_hash + checksum
-        address = BitcoinAddressGenerator._base58_encode(address_bytes)
+        return BitcoinAddressGenerator._base58_encode(address_bytes)
 
-        return address
+    @staticmethod
+    def _pubkey_to_p2wpkh(public_key: bytes, network: str) -> str:
+        """Convert public key to P2WPKH address (SegWit v0)"""
+        from .bitcoin_transaction import Bech32
+
+        # Hash the public key: SHA256 then RIPEMD160
+        sha256_hash = hashlib.sha256(public_key).digest()
+        ripemd160 = hashlib.new('ripemd160')
+        ripemd160.update(sha256_hash)
+        pubkey_hash = ripemd160.digest()
+
+        # Determine HRP based on network
+        if network == "mainnet":
+            hrp = "bc"
+        elif network == "testnet":
+            hrp = "tb"
+        elif network == "regtest":
+            hrp = "bcrt"
+
+        # Encode as bech32 (witness version 0)
+        return Bech32.encode_segwit_address(hrp, 0, pubkey_hash)
+
+    @staticmethod
+    def _pubkey_to_p2tr(public_key: bytes, network: str) -> str:
+        """Convert public key to P2TR address (Taproot - SegWit v1)"""
+        from .bitcoin_transaction import Bech32
+
+        # For Taproot, we use the x-only public key (32 bytes)
+        # Extract x-coordinate from compressed public key (remove parity byte)
+        if len(public_key) != 33:
+            raise ValueError("Public key must be 33 bytes (compressed)")
+
+        # The x-coordinate is bytes 1-33 (skip the parity byte)
+        x_only_pubkey = public_key[1:]
+
+        # Determine HRP based on network
+        if network == "mainnet":
+            hrp = "bc"
+        elif network == "testnet":
+            hrp = "tb"
+        elif network == "regtest":
+            hrp = "bcrt"
+
+        # Encode as bech32m (witness version 1)
+        return Bech32.encode_segwit_address(hrp, 1, x_only_pubkey)
 
     @staticmethod
     def _base58_encode(data: bytes) -> str:
@@ -88,7 +149,8 @@ class BitcoinAddressGenerator:
         change: int = 0,
         start_index: int = 0,
         count: int = 10,
-        network: str = "mainnet"
+        network: str = "mainnet",
+        address_type: str = "p2pkh"
     ) -> List[dict]:
         """
         Generate multiple Bitcoin addresses from xpub
@@ -99,9 +161,10 @@ class BitcoinAddressGenerator:
             start_index: Starting address index
             count: Number of addresses to generate
             network: Network type - "mainnet", "testnet", or "regtest" (default: "mainnet")
+            address_type: Address type - "p2pkh", "p2wpkh", or "p2tr" (default: "p2pkh")
 
         Returns:
-            List of dicts with path, public_key, and address
+            List of dicts with path, public_key, address, and address_type
         """
         addresses = []
 
@@ -119,13 +182,14 @@ class BitcoinAddressGenerator:
             # Derive address key
             address_pubkey, _ = PublicKeyDerivation.derive_public_child(change_xpub, i)
 
-            # Generate address
-            address = BitcoinAddressGenerator.pubkey_to_address(address_pubkey, network)
+            # Generate address with specified type
+            address = BitcoinAddressGenerator.pubkey_to_address(address_pubkey, network, address_type)
 
             addresses.append({
                 'path': f"m/44'/0'/0'/{change}/{i}",
                 'public_key': address_pubkey.hex(),
-                'address': address
+                'address': address,
+                'address_type': address_type
             })
 
         return addresses
