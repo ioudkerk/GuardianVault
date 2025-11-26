@@ -102,6 +102,26 @@ services:
       - regtest-network
     restart: unless-stopped
 
+  ganache:
+    image: trufflesuite/ganache:latest
+    container_name: guardianvault-ganache
+    command: >
+      --wallet.totalAccounts 10
+      --wallet.defaultBalance 1000
+      --chain.chainId 1337
+      --miner.blockTime 0
+      --server.host 0.0.0.0
+      --server.port 8545
+    ports:
+      - "8545:8545"  # Ethereum RPC port
+    networks:
+      - regtest-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8545"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 networks:
   regtest-network:
     driver: bridge

@@ -9,8 +9,6 @@ import json
 import argparse
 import asyncio
 import aiohttp
-import requests
-import time
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -18,42 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from guardianvault.threshold_mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
 from guardianvault.threshold_addresses import BitcoinAddressGenerator
 from guardianvault.bitcoin_transaction import BitcoinTransactionBuilder
-
-
-class BitcoinRPCClient:
-    """Bitcoin RPC client"""
-
-    def __init__(self, host="localhost", port=18443, user="regtest", password="regtest", wallet="regtest_wallet"):
-        self.base_url = f"http://{user}:{password}@{host}:{port}"
-        self.wallet_url = f"{self.base_url}/wallet/{wallet}"
-
-    def rpc_call(self, method, params=[], use_wallet=False):
-        url = self.wallet_url if use_wallet else self.base_url
-        response = requests.post(url, json={
-            "jsonrpc": "1.0",
-            "id": "guardianvault",
-            "method": method,
-            "params": params
-        })
-        result = response.json()
-        if 'error' in result and result['error']:
-            raise Exception(f"RPC Error: {result['error']}")
-        return result['result']
-
-    def scantxoutset(self, action, scanobjects):
-        return self.rpc_call("scantxoutset", [action, scanobjects])
-
-    def sendrawtransaction(self, hexstring):
-        return self.rpc_call("sendrawtransaction", [hexstring])
-
-    def generatetoaddress(self, nblocks, address):
-        return self.rpc_call("generatetoaddress", [nblocks, address])
-
-    def getnewaddress(self, label="", address_type="bech32"):
-        return self.rpc_call("getnewaddress", [label, address_type], use_wallet=True)
-
-    def getrawtransaction(self, txid, verbose=True):
-        return self.rpc_call("getrawtransaction", [txid, verbose])
+from utils.bitcoin_rpc import BitcoinRPCClient
 
 
 def get_address_type_from_tracking(vault_config_file: str, address_index: int) -> str:

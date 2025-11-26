@@ -4,40 +4,35 @@ Bitcoin Regtest Setup Script
 Initializes the Bitcoin regtest environment with wallet and initial blocks
 """
 import sys
-import requests
+import os
 import time
 
+# Add utils to path
+sys.path.insert(0, os.path.dirname(__file__))
 
-class BitcoinRPCClient:
-    """Bitcoin RPC client"""
+from utils.bitcoin_rpc import BitcoinRPCClient as BaseRPCClient
 
-    def __init__(self, host="localhost", port=18443, user="regtest", password="regtest"):
-        self.url = f"http://{user}:{password}@{host}:{port}"
 
-    def rpc_call(self, method, params=[]):
+class BitcoinRPCClient(BaseRPCClient):
+    """Extended Bitcoin RPC client for setup script with error handling"""
+
+    def rpc_call_safe(self, method, params=[], use_wallet=False):
+        """Make RPC call with error handling for setup script"""
         try:
-            response = requests.post(self.url, json={
-                "jsonrpc": "1.0",
-                "id": "guardianvault",
-                "method": method,
-                "params": params
-            })
-            result = response.json()
-            if 'error' in result and result['error']:
-                return {"success": False, "error": result['error']}
-            return {"success": True, "result": result['result']}
+            result = self.rpc_call(method, params, use_wallet)
+            return {"success": True, "result": result}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
     def getblockchaininfo(self):
-        return self.rpc_call("getblockchaininfo")
+        return self.rpc_call_safe("getblockchaininfo")
 
     def listwallets(self):
-        return self.rpc_call("listwallets")
+        return self.rpc_call_safe("listwallets")
 
     def createwallet(self, wallet_name, disable_private_keys=False, blank=False, passphrase="",
                      avoid_reuse=False, descriptors=True, load_on_startup=True):
-        return self.rpc_call("createwallet", [
+        return self.rpc_call_safe("createwallet", [
             wallet_name,
             disable_private_keys,
             blank,
@@ -48,19 +43,19 @@ class BitcoinRPCClient:
         ])
 
     def loadwallet(self, wallet_name):
-        return self.rpc_call("loadwallet", [wallet_name])
+        return self.rpc_call_safe("loadwallet", [wallet_name])
 
     def getnewaddress(self, label="", address_type="bech32"):
-        return self.rpc_call("getnewaddress", [label, address_type])
+        return self.rpc_call_safe("getnewaddress", [label, address_type], use_wallet=True)
 
     def generatetoaddress(self, nblocks, address):
-        return self.rpc_call("generatetoaddress", [nblocks, address])
+        return self.rpc_call_safe("generatetoaddress", [nblocks, address])
 
     def getbalance(self):
-        return self.rpc_call("getbalance")
+        return self.rpc_call_safe("getbalance", use_wallet=True)
 
     def getblockcount(self):
-        return self.rpc_call("getblockcount")
+        return self.rpc_call_safe("getblockcount")
 
 
 def print_header(title):
