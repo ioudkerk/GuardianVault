@@ -15,14 +15,14 @@ from typing import Dict, List, Tuple
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from guardianvault.threshold_mpc_keymanager import (
-    ThresholdKeyGeneration,
-    ThresholdBIP32,
+from guardianvault.mpc_keymanager import (
+    MPCKeyGeneration,
+    MPCBIP32,
     ExtendedPublicKey,
     KeyShare
 )
-from guardianvault.threshold_addresses import BitcoinAddressGenerator
-from guardianvault.threshold_signing import ThresholdSigningWorkflow
+from guardianvault.mpc_addresses import BitcoinAddressGenerator
+from guardianvault.mpc_signing import MPCSigningWorkflow
 from guardianvault.bitcoin_transaction import BitcoinTransactionBuilder
 
 
@@ -164,7 +164,7 @@ def setup_mpc_and_generate_address() -> Tuple[List[KeyShare], ExtendedPublicKey,
     print("Step 1: Generate distributed key shares (3 parties)")
     print("-" * 80)
     num_parties = 3
-    key_shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties)
+    key_shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties)
     print(f"✓ Generated {num_parties} key shares")
     print()
 
@@ -175,14 +175,14 @@ def setup_mpc_and_generate_address() -> Tuple[List[KeyShare], ExtendedPublicKey,
     print(f"Using seed: {seed.hex()[:32]}...")
 
     master_shares, master_pubkey, master_chain = \
-        ThresholdBIP32.derive_master_keys_threshold(key_shares, seed)
+        MPCBIP32.derive_master_keys_distributed(key_shares, seed)
     print(f"✓ Master public key: {master_pubkey.hex()[:32]}...")
     print()
 
     # Derive Bitcoin account xpub (m/44'/0'/0')
     print("Step 3: Derive Bitcoin account xpub (m/44'/0'/0')")
     print("-" * 80)
-    btc_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    btc_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=0, account=0
     )
     print(f"✓ Bitcoin xpub: {btc_xpub.public_key.hex()[:32]}...")
@@ -191,13 +191,13 @@ def setup_mpc_and_generate_address() -> Tuple[List[KeyShare], ExtendedPublicKey,
     # Get account-level shares for signing
     print("Step 4: Derive account-level key shares for signing")
     print("-" * 80)
-    btc_account_shares, account_pubkey, account_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, account_pubkey, account_chain = MPCBIP32.derive_hardened_child_distributed(
         master_shares, master_pubkey, master_chain, 44
     )
-    btc_account_shares, account_pubkey, account_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, account_pubkey, account_chain = MPCBIP32.derive_hardened_child_distributed(
         btc_account_shares, account_pubkey, account_chain, 0
     )
-    btc_account_shares, account_pubkey, account_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, account_pubkey, account_chain = MPCBIP32.derive_hardened_child_distributed(
         btc_account_shares, account_pubkey, account_chain, 0
     )
     print(f"✓ Derived account-level shares for m/44'/0'/0'")
@@ -364,7 +364,7 @@ def create_and_sign_transaction(
     public_key = bytes.fromhex(address_info['public_key'])
 
     print("  Executing distributed threshold signing...")
-    signature = ThresholdSigningWorkflow.sign_message(
+    signature = MPCSigningWorkflow.sign_message(
         btc_account_shares,
         sighash,
         public_key,

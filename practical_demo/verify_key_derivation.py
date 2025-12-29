@@ -10,9 +10,9 @@ import argparse
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import (
+from guardianvault.mpc_keymanager import (
     KeyShare,
-    ThresholdBIP32,
+    MPCBIP32,
     ExtendedPublicKey,
     PublicKeyDerivation,
     EllipticCurvePoint,

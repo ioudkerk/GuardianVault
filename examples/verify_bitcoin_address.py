@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from guardianvault.threshold_addresses import BitcoinAddressGenerator
+from guardianvault.mpc_addresses import BitcoinAddressGenerator
 import base58
 
 
@@ -116,21 +116,21 @@ def main():
     print()
 
     import secrets
-    from guardianvault.threshold_mpc_keymanager import ThresholdKeyGeneration, ThresholdBIP32
+    from guardianvault.mpc_keymanager import MPCKeyGeneration, MPCBIP32
 
     # Generate MPC key
-    key_shares, _ = ThresholdKeyGeneration.generate_shares(3)
+    key_shares, _ = MPCKeyGeneration.generate_shares(3)
     seed = secrets.token_bytes(32)
-    master_shares, master_pubkey, master_chain = ThresholdBIP32.derive_master_keys_threshold(key_shares, seed)
+    master_shares, master_pubkey, master_chain = MPCBIP32.derive_master_keys_distributed(key_shares, seed)
 
     # Derive account key
-    btc_account_shares, account_pubkey, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, account_pubkey, _ = MPCBIP32.derive_hardened_child_distributed(
         master_shares, master_pubkey, master_chain, 44
     )
-    btc_account_shares, account_pubkey, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, account_pubkey, _ = MPCBIP32.derive_hardened_child_distributed(
         btc_account_shares, account_pubkey, _, 0
     )
-    btc_account_shares, account_pubkey, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, account_pubkey, _ = MPCBIP32.derive_hardened_child_distributed(
         btc_account_shares, account_pubkey, _, 0
     )
 

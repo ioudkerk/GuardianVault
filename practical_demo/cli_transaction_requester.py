@@ -15,8 +15,8 @@ from typing import Dict
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
-from guardianvault.threshold_addresses import BitcoinAddressGenerator
+from guardianvault.mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
+from guardianvault.mpc_addresses import BitcoinAddressGenerator
 from guardianvault.bitcoin_transaction import BitcoinTransactionBuilder
 from utils.bitcoin_rpc import BitcoinRPCClient
 

@@ -33,18 +33,18 @@ python enhanced_crypto_mpc.py
 # Run practical workflow simulation
 python mpc_workflow_example.py
 
-# THRESHOLD CRYPTOGRAPHY (NEW - No Key Reconstruction)
-# Run threshold key generation demo
-python threshold_mpc_keymanager.py
+# MPC WITH ADDITIVE SECRET SHARING (NEW - No Key Reconstruction)
+# Run MPC key generation demo
+python -m guardianvault.mpc_keymanager
 
-# Run threshold address generation
-python threshold_addresses.py
+# Run MPC address generation
+python -m guardianvault.mpc_addresses
 
-# Run threshold signing demo
-python threshold_signing.py
+# Run MPC signing demo
+python -m guardianvault.mpc_signing
 
 # Run complete workflow (setup → addresses → signing)
-python complete_mpc_workflow.py
+python examples/complete_mpc_workflow.py
 
 # Run tests (if pytest is installed)
 pytest
@@ -98,30 +98,30 @@ python mpc_cli.py info -s ./shares/share_1.json
   - Shows multi-party share distribution
   - Demonstrates reconstruction workflow
 
-#### Threshold Cryptography Implementation (NEW)
+#### MPC with Additive Secret Sharing Implementation (NEW)
 
-- **threshold_mpc_keymanager.py** (~600 lines): Threshold key generation and derivation
-  - `ThresholdKeyGeneration`: Additive secret sharing (t-of-t scheme)
-  - `ThresholdBIP32`: Threshold BIP32 operations without key reconstruction
+- **mpc_keymanager.py** (~600 lines): MPC key generation and derivation
+  - `MPCKeyGeneration`: Additive secret sharing (n-of-n scheme - all parties required)
+  - `MPCBIP32`: Distributed BIP32 operations without key reconstruction
   - `PublicKeyDerivation`: Derive unlimited addresses from xpub alone
   - `EllipticCurvePoint`: Pure Python secp256k1 implementation
   - `ExtendedPublicKey`: BIP32 xpub for public derivation
 
-- **threshold_addresses.py** (~300 lines): Address generation from public keys
+- **mpc_addresses.py** (~300 lines): Address generation from public keys
   - `BitcoinAddressGenerator`: Generate Bitcoin addresses from xpub
   - `EthereumAddressGenerator`: Generate Ethereum addresses from xpub
   - No private keys required!
 
-- **threshold_signing.py** (~400 lines): Threshold ECDSA signing
-  - `ThresholdSigner`: 4-round MPC signing protocol
+- **mpc_signing.py** (~400 lines): MPC ECDSA signing
+  - `MPCSigner`: 4-round MPC signing protocol
   - `ThresholdSignature`: DER and compact signature formats
-  - `ThresholdSigningWorkflow`: Complete signing workflow
+  - `MPCSigningWorkflow`: Complete signing workflow
   - Signatures created WITHOUT reconstructing private key
 
-- **complete_mpc_workflow.py** (~400 lines): End-to-end demonstration
-  - Phase 1: Setup with threshold computation (one-time)
-  - Phase 2: Unlimited address generation (no threshold)
-  - Phase 3: Transaction signing with threshold protocol
+- **examples/complete_mpc_workflow.py** (~400 lines): End-to-end demonstration
+  - Phase 1: Setup with MPC computation (one-time, all parties)
+  - Phase 2: Unlimited address generation (no MPC)
+  - Phase 3: Transaction signing with MPC protocol
   - Simulates async multi-party operations
 
 ### Key Architectural Concepts
@@ -167,9 +167,11 @@ Ethereum: m/44'/60'/account'/0/index
 
 ---
 
-#### Approach 2: Threshold Cryptography (NEW - Recommended)
+#### Approach 2: MPC with Additive Secret Sharing (NEW - Recommended)
 
 **Core Innovation**: Private key NEVER reconstructed - not even temporarily!
+
+**Note**: This is an (n,n) scheme - all parties must participate. For true threshold (t,n) schemes with fault tolerance, see Shamir-based implementations.
 
 ##### 1. Additive Secret Sharing
 
@@ -185,9 +187,9 @@ Public Key = G × share_1 + G × share_2 + G × share_3
 
 ##### 2. Three-Phase Operational Model
 
-**Phase 1: One-Time Setup (Threshold Computation)**
+**Phase 1: One-Time Setup (MPC - All Parties Required)**
 ```
-Parties collaborate using threshold BIP32 to derive:
+Parties collaborate using distributed BIP32 to derive:
   m → m/44' → m/44'/coin' → m/44'/coin'/account'
 
 Output: Extended Public Key (xpub) for account
@@ -197,7 +199,7 @@ Output: Extended Public Key (xpub) for account
 ✓ xpub published for public use
 ```
 
-**Phase 2: Address Generation (NO Threshold!)**
+**Phase 2: Address Generation (NO MPC!)**
 ```
 Anyone with xpub can derive unlimited addresses:
   xpub/0/0, xpub/0/1, xpub/0/2, ...
@@ -206,12 +208,12 @@ Using non-hardened BIP32 derivation from public key:
   child_pubkey = parent_pubkey + G × HMAC(...)
 
 ✓ No private keys needed
-✓ No threshold computation
+✓ No MPC computation
 ✓ No party communication required
 ✓ Can be done by untrusted party (e.g., payment processor)
 ```
 
-**Phase 3: Transaction Signing (Threshold Computation)**
+**Phase 3: Transaction Signing (MPC - All Parties Required)**
 ```
 4-Round MPC Protocol:
   Round 1: Each party generates nonce share k_i
@@ -232,17 +234,17 @@ Output: Valid ECDSA signature (r, s)
 
 - **Hardened levels** (with `'`): m, 44', 0', 0'
   - Require private key for derivation
-  - Need threshold computation
+  - Need MPC computation (all parties)
   - Done ONCE during setup
 
 - **Non-hardened levels**: 0, 0
   - Can derive from public key only!
-  - No threshold computation needed
+  - No MPC computation needed
   - Unlimited addresses
 
 **This is why we can generate unlimited addresses after one-time setup!**
 
-##### 4. Threshold ECDSA Signing Protocol
+##### 4. MPC ECDSA Signing Protocol
 
 Standard ECDSA: `s = k^(-1) × (z + r×x) mod n`
 

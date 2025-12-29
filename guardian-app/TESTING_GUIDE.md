@@ -171,7 +171,7 @@ ls -la ../ | grep guardianvault
 which python3
 
 # Test Python import
-python3 -c "from guardianvault.threshold_signing import ThresholdSigner; print('OK')"
+python3 -c "from guardianvault.mpc_signing import MPCSigner; print('OK')"
 ```
 
 ### Keystore errors

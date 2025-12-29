@@ -14,13 +14,13 @@ import aiohttp
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import (
+from guardianvault.mpc_keymanager import (
     KeyShare,
-    ThresholdBIP32,
+    MPCBIP32,
     ExtendedPublicKey,
     PublicKeyDerivation
 )
-from guardianvault.threshold_signing import ThresholdSigner
+from guardianvault.mpc_signing import MPCSigner
 
 
 class GuardianClient:
@@ -93,7 +93,7 @@ class GuardianClient:
         """
         import hmac
         import hashlib
-        from guardianvault.threshold_mpc_keymanager import SECP256K1_N
+        from guardianvault.mpc_keymanager import SECP256K1_N
 
         # Ensure non-hardened
         if index >= 0x80000000:
@@ -229,7 +229,7 @@ class GuardianClient:
         print("Round 1: Generating nonce share...")
 
         # Generate nonce
-        self.nonce_share, self.r_point = ThresholdSigner.sign_round1_generate_nonce(
+        self.nonce_share, self.r_point = MPCSigner.sign_round1_generate_nonce(
             self.bitcoin_account_share.party_id
         )
 
@@ -349,7 +349,7 @@ class GuardianClient:
             print(f"    r: {hex(r)[:32]}...")
             print(f"    k_total: {hex(k_total)[:32]}...")
 
-            signature_share = ThresholdSigner.sign_round3_compute_signature_share(
+            signature_share = MPCSigner.sign_round3_compute_signature_share(
                 key_share=signing_share,
                 nonce_share=self.nonce_share,
                 message_hash=bytes.fromhex(message_hash_hex),
@@ -361,7 +361,7 @@ class GuardianClient:
             print(f"  ✓ Signature share computed: {hex(signature_share)[:32]}...")
 
             # Verify the signature share is valid (non-zero and within range)
-            from guardianvault.threshold_mpc_keymanager import SECP256K1_N
+            from guardianvault.mpc_keymanager import SECP256K1_N
             if signature_share == 0 or signature_share >= SECP256K1_N:
                 print(f"  ⚠️  WARNING: Signature share out of range!")
                 print(f"    Value: {signature_share}")

@@ -1,19 +1,22 @@
-# Threshold Cryptography Architecture
+# MPC Architecture with Additive Secret Sharing
 
 ## Overview
 
-This document describes the **Threshold Cryptography** implementation where the private key is **NEVER reconstructed** - not even temporarily.
+This document describes the **MPC (Multi-Party Computation)** implementation using **Additive Secret Sharing** where the private key is **NEVER reconstructed** - not even temporarily.
+
+**Note**: This is an **(n,n) scheme** - all parties must participate. For true threshold (t,n) schemes with fault tolerance, see Shamir-based implementations.
 
 ## System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                 THRESHOLD MPC CRYPTOCURRENCY KEY MANAGER                  │
+│              MPC CRYPTOCURRENCY KEY MANAGER (ADDITIVE SHARING)           │
 │                    Private Key NEVER Reconstructed                        │
+│                  n-of-n Scheme (All Parties Required)                    │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  PHASE 1: ONE-TIME SETUP (Threshold Computation Required)               │
+│  PHASE 1: ONE-TIME SETUP (MPC - All Parties Required)                   │
 └─────────────────────────────────────────────────────────────────────────┘
 
     Party 1                Party 2                Party 3
@@ -24,7 +27,7 @@ This document describes the **Threshold Cryptography** implementation where the 
         └─────────┬───────────┴───────────┬─────────┘
                   │                       │
                   ▼                       ▼
-          Threshold BIP32          Additive Sharing
+          Distributed BIP32        Additive Sharing
           Derive m/44'/0'/0'       x = x₁ + x₂ + x₃
                   │
                   ▼
@@ -34,7 +37,7 @@ This document describes the **Threshold Cryptography** implementation where the 
           └──────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  PHASE 2: ADDRESS GENERATION (NO Threshold Computation!)                │
+│  PHASE 2: ADDRESS GENERATION (NO MPC Computation Needed!)               │
 └─────────────────────────────────────────────────────────────────────────┘
 
           ┌──────────────┐
@@ -50,12 +53,12 @@ This document describes the **Threshold Cryptography** implementation where the 
                  └──→ ...         (UNLIMITED!)
 
     ✓ No private keys needed
-    ✓ No threshold computation
+    ✓ No MPC computation
     ✓ No party communication
     ✓ Can be done by untrusted party
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  PHASE 3: TRANSACTION SIGNING (Threshold Computation, Key NEVER exists)│
+│  PHASE 3: TRANSACTION SIGNING (MPC - All Parties, Key NEVER exists)    │
 └─────────────────────────────────────────────────────────────────────────┘
 
 ROUND 1: Nonce Generation

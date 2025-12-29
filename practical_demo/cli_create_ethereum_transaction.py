@@ -13,8 +13,8 @@ import aiohttp
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
-from guardianvault.threshold_addresses import EthereumAddressGenerator
+from guardianvault.mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
+from guardianvault.mpc_addresses import EthereumAddressGenerator
 from guardianvault.ethereum_transaction import EthereumTransactionBuilder, EthereumTransaction, LegacyEthereumTransaction
 from guardianvault.ethereum_rpc import EthereumRPCClient
 
@@ -238,7 +238,7 @@ async def complete_ethereum_transaction_flow(
     signed_message_hash = bytes.fromhex(signed_tx['message_hash'])
 
     # Recover v parameter for Ethereum
-    from guardianvault.threshold_signing import ThresholdSignature, ThresholdSigner
+    from guardianvault.mpc_signing import ThresholdSignature, MPCSigner
 
     threshold_sig = ThresholdSignature(r=r, s=s)
 
@@ -258,7 +258,7 @@ async def complete_ethereum_transaction_flow(
         print(f"  Signature r: {hex(r)}")
         print(f"  Signature s: {hex(s)}")
 
-        v = ThresholdSigner.recover_ethereum_v(
+        v = MPCSigner.recover_ethereum_v(
             public_key=sender_pubkey,
             message_hash=signed_message_hash,  # Use the hash that was actually signed
             signature=threshold_sig
@@ -274,7 +274,7 @@ async def complete_ethereum_transaction_flow(
         print(f"\n  Trying basic signature verification first...")
 
         # Try basic verification to see if signature is valid
-        is_valid_basic = ThresholdSigner.verify_signature(
+        is_valid_basic = MPCSigner.verify_signature(
             public_key=sender_pubkey,
             message_hash=signed_message_hash,
             signature=threshold_sig
@@ -289,7 +289,7 @@ async def complete_ethereum_transaction_flow(
         return False
 
     # Verify signature
-    is_valid = ThresholdSigner.verify_signature(
+    is_valid = MPCSigner.verify_signature(
         public_key=sender_pubkey,
         message_hash=signed_message_hash,
         signature=threshold_sig

@@ -13,8 +13,8 @@ import aiohttp
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
-from guardianvault.threshold_addresses import BitcoinAddressGenerator
+from guardianvault.mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
+from guardianvault.mpc_addresses import BitcoinAddressGenerator
 from guardianvault.bitcoin_transaction import BitcoinTransactionBuilder
 from utils.bitcoin_rpc import BitcoinRPCClient
 
@@ -256,7 +256,7 @@ async def complete_transaction_flow(
     # Verify the signature is valid before broadcasting
     print(f"\n  Verifying ECDSA signature...")
     try:
-        from guardianvault.threshold_signing import ThresholdSignature, ThresholdSigner
+        from guardianvault.mpc_signing import ThresholdSignature, MPCSigner
         r = signature.get('r')
         s = signature.get('s')
 
@@ -264,7 +264,7 @@ async def complete_transaction_flow(
             # r and s are stored as decimal strings, not hex
             threshold_sig = ThresholdSignature(int(r), int(s))
             # Verify signature against the sighash
-            is_valid = ThresholdSigner.verify_signature(correct_pubkey, computed_sighash, threshold_sig)
+            is_valid = MPCSigner.verify_signature(correct_pubkey, computed_sighash, threshold_sig)
             print(f"  Signature mathematically valid: {is_valid}")
 
             if not is_valid:

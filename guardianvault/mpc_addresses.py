@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Bitcoin and Ethereum address generation from public keys
-Works with threshold_mpc_keymanager.py for TRUE MPC (no private key reconstruction)
+Works with mpc_keymanager.py for TRUE MPC (no private key reconstruction)
 """
 
 import hashlib
 from typing import List
-from .threshold_mpc_keymanager import (
+from .mpc_keymanager import (
     ExtendedPublicKey,
     PublicKeyDerivation,
     EllipticCurvePoint
@@ -324,43 +324,43 @@ class EthereumAddressGenerator:
 
 if __name__ == "__main__":
     import secrets
-    from .threshold_mpc_keymanager import (
-        ThresholdKeyGeneration,
-        ThresholdBIP32
+    from .mpc_keymanager import (
+        MPCKeyGeneration,
+        MPCBIP32
     )
 
     print("=" * 80)
-    print("THRESHOLD ADDRESS GENERATION DEMO")
+    print("MPC ADDRESS GENERATION DEMO")
     print("Unlimited addresses WITHOUT reconstructing private key!")
     print("=" * 80)
     print()
 
-    # Setup (threshold computation required once)
+    # Setup (MPC computation required once - all parties must participate)
     num_parties = 3
-    key_shares, _ = ThresholdKeyGeneration.generate_shares(num_parties)
+    key_shares, _ = MPCKeyGeneration.generate_shares(num_parties)
 
     seed = secrets.token_bytes(32)
     master_shares, master_pubkey, master_chain = \
-        ThresholdBIP32.derive_master_keys_threshold(key_shares, seed)
+        MPCBIP32.derive_master_keys_distributed(key_shares, seed)
 
-    print("ONE-TIME SETUP: Deriving account xpubs (threshold computation)")
+    print(f"ONE-TIME SETUP: Deriving account xpubs (MPC - all {num_parties} parties)")
     print("-" * 80)
 
     # Bitcoin account xpub
-    btc_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    btc_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=0, account=0
     )
-    print(f"✓ Bitcoin xpub: {btc_xpub.public_key.hex()[:32]}...")
+    print(f"Bitcoin xpub: {btc_xpub.public_key.hex()[:32]}...")
 
     # Ethereum account xpub
-    eth_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    eth_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=60, account=0
     )
-    print(f"✓ Ethereum xpub: {eth_xpub.public_key.hex()[:32]}...")
+    print(f"Ethereum xpub: {eth_xpub.public_key.hex()[:32]}...")
     print()
 
-    # Generate unlimited Bitcoin addresses (no threshold!)
-    print("BITCOIN ADDRESSES (No threshold computation!)")
+    # Generate unlimited Bitcoin addresses (no MPC needed!)
+    print("BITCOIN ADDRESSES (No MPC computation needed!)")
     print("-" * 80)
     btc_addresses = BitcoinAddressGenerator.generate_addresses_from_xpub(
         btc_xpub, change=0, start_index=0, count=5
@@ -371,8 +371,8 @@ if __name__ == "__main__":
         print(f"    Address: {addr['address']}")
         print()
 
-    # Generate unlimited Ethereum addresses (no threshold!)
-    print("ETHEREUM ADDRESSES (No threshold computation!)")
+    # Generate unlimited Ethereum addresses (no MPC needed!)
+    print("ETHEREUM ADDRESSES (No MPC computation needed!)")
     print("-" * 80)
     eth_addresses = EthereumAddressGenerator.generate_addresses_from_xpub(
         eth_xpub, change=0, start_index=0, count=5
@@ -385,7 +385,7 @@ if __name__ == "__main__":
 
     print("=" * 80)
     print("SUCCESS!")
-    print("✓ Generated Bitcoin and Ethereum addresses")
-    print("✓ No private key reconstruction needed")
-    print("✓ Can generate unlimited addresses from xpub")
+    print("Generated Bitcoin and Ethereum addresses")
+    print("No private key reconstruction needed")
+    print("Can generate unlimited addresses from xpub")
     print("=" * 80)

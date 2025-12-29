@@ -9,9 +9,9 @@ import json
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import (
+from guardianvault.mpc_keymanager import (
     KeyShare,
-    ThresholdBIP32,
+    MPCBIP32,
     ExtendedPublicKey,
     EllipticCurvePoint,
     SECP256K1_N
@@ -83,7 +83,7 @@ def verify_account_shares(vault_config_file: str, share_files: list):
     print(f"\nTest 2: Testing non-hardened derivation (m/44'/0'/0'/0)...")
 
     # Use the PUBLIC derivation
-    from guardianvault.threshold_mpc_keymanager import PublicKeyDerivation
+    from guardianvault.mpc_keymanager import PublicKeyDerivation
 
     change_pub, change_chain = PublicKeyDerivation.derive_public_child(
         account_xpub, 0
