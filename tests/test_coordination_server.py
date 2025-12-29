@@ -25,15 +25,15 @@ from ecdsa.ellipticcurve import Point
 import hashlib
 import secrets
 
-# Import existing threshold crypto modules from guardianvault package
-from guardianvault.threshold_mpc_keymanager import (
-    ThresholdKeyGeneration,
-    ThresholdBIP32,
-    KeyShare as ThresholdKeyShare,
+# Import existing MPC crypto modules from guardianvault package
+from guardianvault.mpc_keymanager import (
+    MPCKeyGeneration,
+    MPCBIP32,
+    KeyShare as MPCKeyShare,
     ExtendedPublicKey
 )
-from guardianvault.threshold_signing import ThresholdSigner, KeyShare
-from guardianvault.threshold_addresses import BitcoinAddressGenerator, EthereumAddressGenerator
+from guardianvault.mpc_signing import MPCSigner, KeyShare
+from guardianvault.mpc_addresses import BitcoinAddressGenerator, EthereumAddressGenerator
 
 # Configuration
 COORD_SERVER_URL = "http://localhost:8000"
@@ -73,53 +73,53 @@ def print_error(message: str):
 # ==============================================================================
 
 def generate_key_shares(num_parties: int = 3, threshold: int = 3):
-    """Generate threshold key shares for guardians"""
-    print_step("1", "Generating Threshold Key Shares")
+    """Generate MPC key shares for guardians"""
+    print_step("1", "Generating MPC Key Shares")
 
     # Generate initial key shares
     print_info(f"Generating {num_parties} key shares...")
-    shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties, threshold)
+    shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties, threshold)
     print_success(f"Key shares generated")
 
     # Derive BIP32 master keys
     print_info("Deriving BIP32 master keys...")
     seed = secrets.token_bytes(32)
-    master_shares, master_pubkey, master_chain = ThresholdBIP32.derive_master_keys_threshold(shares, seed)
+    master_shares, master_pubkey, master_chain = MPCBIP32.derive_master_keys_threshold(shares, seed)
     print_success(f"Master public key: {master_pubkey.hex()[:32]}...")
 
     # Derive Bitcoin account xpub (m/44'/0'/0')
     print_info("Deriving Bitcoin account (m/44'/0'/0')...")
-    btc_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    btc_xpub = MPCBIP32.derive_account_xpub_threshold(
         master_shares, master_chain, coin_type=0, account=0
     )
 
     # Get the Bitcoin account shares
     # Derive m/44' -> m/44'/0' -> m/44'/0'/0'
-    btc_shares_44, btc_pub_44, btc_chain_44 = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_shares_44, btc_pub_44, btc_chain_44 = MPCBIP32.derive_hardened_child_threshold(
         master_shares, master_pubkey, master_chain, 44
     )
-    btc_shares_0, btc_pub_0, btc_chain_0 = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_shares_0, btc_pub_0, btc_chain_0 = MPCBIP32.derive_hardened_child_threshold(
         btc_shares_44, btc_pub_44, btc_chain_44, 0
     )
-    btc_master_shares, btc_pub_final, btc_chain_final = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_master_shares, btc_pub_final, btc_chain_final = MPCBIP32.derive_hardened_child_threshold(
         btc_shares_0, btc_pub_0, btc_chain_0, 0
     )
 
     # Derive Ethereum account xpub (m/44'/60'/0')
     print_info("Deriving Ethereum account (m/44'/60'/0')...")
-    eth_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    eth_xpub = MPCBIP32.derive_account_xpub_threshold(
         master_shares, master_chain, coin_type=60, account=0
     )
 
     # Get the Ethereum account shares
     # Derive m/44' -> m/44'/60' -> m/44'/60'/0'
-    eth_shares_44, eth_pub_44, eth_chain_44 = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_shares_44, eth_pub_44, eth_chain_44 = MPCBIP32.derive_hardened_child_threshold(
         master_shares, master_pubkey, master_chain, 44
     )
-    eth_shares_60, eth_pub_60, eth_chain_60 = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_shares_60, eth_pub_60, eth_chain_60 = MPCBIP32.derive_hardened_child_threshold(
         eth_shares_44, eth_pub_44, eth_chain_44, 60
     )
-    eth_master_shares, eth_pub_final, eth_chain_final = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_master_shares, eth_pub_final, eth_chain_final = MPCBIP32.derive_hardened_child_threshold(
         eth_shares_60, eth_pub_60, eth_chain_60, 0
     )
 
@@ -347,7 +347,7 @@ class GuardianSigningClient:
 
         # Load the Bitcoin key share for signing
         btc_share_data = self.party_data['master_shares']['bitcoin']
-        self.key_share = ThresholdKeyShare(
+        self.key_share = MPCKeyShare(
             party_id=btc_share_data['party_id'],
             share_value=bytes.fromhex(btc_share_data['share_value']),
             total_parties=btc_share_data['total_parties'],
@@ -419,7 +419,7 @@ class GuardianSigningClient:
         print_info(f"  {self.guardian['name']} executing Round 1...")
 
         # Generate nonce and R point using static method
-        self.nonce_share, r_point_bytes = ThresholdSigner.sign_round1_generate_nonce(
+        self.nonce_share, r_point_bytes = MPCSigner.sign_round1_generate_nonce(
             self.key_share.party_id
         )
 
@@ -463,7 +463,7 @@ class GuardianSigningClient:
 
         # Compute signature share using static method
         message_hash_bytes = bytes.fromhex(self.message_hash)
-        sig_share = ThresholdSigner.sign_round3_compute_signature_share(
+        sig_share = MPCSigner.sign_round3_compute_signature_share(
             key_share=self.key_share,
             nonce_share=self.nonce_share,
             message_hash=message_hash_bytes,

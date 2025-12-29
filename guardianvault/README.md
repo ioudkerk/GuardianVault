@@ -6,26 +6,26 @@ The core Python library for threshold cryptography and multi-party computation (
 
 GuardianVault provides a secure way to manage cryptocurrency keys using threshold cryptography, where the private key is split into multiple shares and never reconstructed. This library implements:
 
-- Threshold key generation (Shamir's Secret Sharing)
+- MPC key generation (Shamir's Secret Sharing)
 - BIP32 hierarchical deterministic key derivation
-- Threshold ECDSA signing (without reconstructing private keys)
+- MPC ECDSA signing (without reconstructing private keys)
 - Bitcoin and Ethereum address generation
 
 ## Modules
 
-### `threshold_mpc_keymanager.py`
-Core threshold key management functionality:
-- `ThresholdKeyGeneration` - Generate and manage threshold key shares
-- `ThresholdBIP32` - BIP32 hierarchical key derivation for threshold keys
+### `mpc_keymanager.py`
+Core MPC key management functionality:
+- `MPCKeyGeneration` - Generate and manage MPC key shares
+- `MPCBIP32` - BIP32 hierarchical key derivation for MPC keys
 - `KeyShare` - Data class representing a key share
 - `ExtendedPublicKey` - Extended public key (xpub) functionality
 
-### `threshold_signing.py`
-Threshold ECDSA signing without key reconstruction:
-- `ThresholdSigner` - 4-round MPC signing protocol
-- `ThresholdSigningWorkflow` - High-level signing workflow
+### `mpc_signing.py`
+MPC ECDSA signing without key reconstruction:
+- `MPCSigner` - 4-round MPC signing protocol
+- `MPCSigningWorkflow` - High-level signing workflow
 
-### `threshold_addresses.py`
+### `mpc_addresses.py`
 Cryptocurrency address generation from public keys:
 - `BitcoinAddressGenerator` - Generate Bitcoin addresses (P2PKH, P2SH, Bech32)
 - `EthereumAddressGenerator` - Generate Ethereum addresses
@@ -50,20 +50,20 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Generate Threshold Keys
+### Generate MPC Keys
 
 ```python
-from guardianvault import ThresholdKeyGeneration, ThresholdBIP32
+from guardianvault import MPCKeyGeneration, MPCBIP32
 
 # Generate key shares for 3 parties with 3-of-3 threshold
-shares, master_pubkey = ThresholdKeyGeneration.generate_shares(
+shares, master_pubkey = MPCKeyGeneration.generate_shares(
     num_parties=3,
     threshold=3
 )
 
 # Derive BIP32 master keys
 seed = secrets.token_bytes(32)
-master_shares, master_pub, chain = ThresholdBIP32.derive_master_keys_threshold(
+master_shares, master_pub, chain = MPCBIP32.derive_master_keys_threshold(
     shares,
     seed
 )
@@ -84,16 +84,16 @@ address = BitcoinAddressGenerator.pubkey_to_address(
 ### Sign Transactions
 
 ```python
-from guardianvault import ThresholdSigner
+from guardianvault import MPCSigner
 
 # Each party generates nonce share (Round 1)
-nonce_share, r_point = ThresholdSigner.sign_round1_generate_nonce(party_id)
+nonce_share, r_point = MPCSigner.sign_round1_generate_nonce(party_id)
 
 # Server combines R points (Round 2)
 # ...
 
 # Each party computes signature share (Round 3)
-sig_share = ThresholdSigner.sign_round3_compute_signature_share(
+sig_share = MPCSigner.sign_round3_compute_signature_share(
     key_share=key_share,
     nonce_share=nonce_share,
     message_hash=msg_hash,
