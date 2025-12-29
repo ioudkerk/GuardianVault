@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-Threshold MPC Cryptocurrency Key Manager
-Uses threshold cryptography where private key is NEVER reconstructed
+MPC Cryptocurrency Key Manager with Additive Secret Sharing
+Uses n-of-n multi-party computation where private key is NEVER reconstructed
 
 Key Features:
-- Additive secret sharing for MPC operations
-- Threshold BIP32 derivation for account setup
+- Additive secret sharing for MPC operations (all parties required)
+- Distributed BIP32 derivation for account setup
 - Public derivation for unlimited addresses
-- Threshold ECDSA signatures
+- MPC ECDSA signatures
+
+Note: This is an (n,n) scheme - all parties must participate to sign.
+For true threshold (t,n) schemes, see Shamir-based implementations.
 
 SECURITY: Private key shares never leave their respective parties
 """
@@ -173,8 +176,8 @@ class EllipticCurvePoint:
             raise ValueError("Invalid point encoding")
 
 
-class ThresholdKeyGeneration:
-    """Generate distributed keys using additive secret sharing"""
+class MPCKeyGeneration:
+    """Generate distributed keys using additive secret sharing (n-of-n scheme)"""
 
     @staticmethod
     def generate_shares(num_parties: int, threshold: int = None) -> Tuple[List[KeyShare], bytes]:
@@ -253,16 +256,16 @@ class ThresholdKeyGeneration:
         return computed_public_key == expected_public_key
 
 
-class ThresholdBIP32:
-    """Threshold BIP32 operations without reconstructing private key"""
+class MPCBIP32:
+    """MPC BIP32 operations without reconstructing private key (n-of-n scheme)"""
 
     @staticmethod
-    def derive_master_keys_threshold(
+    def derive_master_keys_distributed(
         key_shares: List[KeyShare],
         seed: Optional[bytes] = None
     ) -> Tuple[List[KeyShare], bytes, bytes]:
         """
-        Threshold computation of BIP32 master key derivation
+        Distributed MPC computation of BIP32 master key derivation
 
         Each party:
         1. Computes HMAC-SHA512("Bitcoin seed", seed) locally
@@ -317,14 +320,14 @@ class ThresholdBIP32:
         return master_shares, master_public_key, chain_code
 
     @staticmethod
-    def derive_hardened_child_threshold(
+    def derive_hardened_child_distributed(
         parent_shares: List[KeyShare],
         parent_public_key: bytes,
         parent_chain_code: bytes,
         index: int
     ) -> Tuple[List[KeyShare], bytes, bytes]:
         """
-        Threshold computation of hardened child key derivation
+        Distributed MPC computation of hardened child key derivation
 
         Each party derives their share of the child key without revealing their parent share.
 
@@ -388,17 +391,17 @@ class ThresholdBIP32:
         return child_shares, child_public_key, child_chain_code
 
     @staticmethod
-    def derive_account_xpub_threshold(
+    def derive_account_xpub_distributed(
         master_shares: List[KeyShare],
         master_chain_code: bytes,
         coin_type: int = 0,
         account: int = 0
     ) -> ExtendedPublicKey:
         """
-        Derive account xpub using threshold computation
+        Derive account xpub using distributed MPC computation
         Path: m/44'/coin_type'/account'
 
-        This is the ONE-TIME threshold operation needed.
+        This is the ONE-TIME MPC operation needed (all parties must participate).
         After this, unlimited addresses can be derived from xpub alone!
 
         Args:
@@ -412,19 +415,19 @@ class ThresholdBIP32:
         """
         # Derive m/44'
         purpose_shares, purpose_pubkey, purpose_chain = \
-            ThresholdBIP32.derive_hardened_child_threshold(
+            MPCBIP32.derive_hardened_child_distributed(
                 master_shares, None, master_chain_code, 44
             )
 
         # Derive m/44'/coin_type'
         coin_shares, coin_pubkey, coin_chain = \
-            ThresholdBIP32.derive_hardened_child_threshold(
+            MPCBIP32.derive_hardened_child_distributed(
                 purpose_shares, purpose_pubkey, purpose_chain, coin_type
             )
 
         # Derive m/44'/coin_type'/account'
         account_shares, account_pubkey, account_chain = \
-            ThresholdBIP32.derive_hardened_child_threshold(
+            MPCBIP32.derive_hardened_child_distributed(
                 coin_shares, coin_pubkey, coin_chain, account
             )
 
@@ -541,7 +544,7 @@ def load_xpub_from_file(filename: str) -> ExtendedPublicKey:
 
 if __name__ == "__main__":
     print("=" * 80)
-    print("THRESHOLD MPC KEY MANAGER - DEMO")
+    print("MPC KEY MANAGER WITH ADDITIVE SECRET SHARING - DEMO")
     print("Private key is NEVER reconstructed!")
     print("=" * 80)
     print()
@@ -549,45 +552,45 @@ if __name__ == "__main__":
     # Simulate 3 parties
     num_parties = 3
 
-    print(f"PHASE 1: Key Generation ({num_parties} parties)")
+    print(f"PHASE 1: Key Generation ({num_parties} parties, {num_parties}-of-{num_parties} scheme)")
     print("-" * 80)
 
     # Generate initial shares
-    key_shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties)
-    print(f"✓ Generated {num_parties} key shares")
+    key_shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties)
+    print(f"Generated {num_parties} key shares")
     for share in key_shares:
         print(f"  Party {share.party_id}: {share.share_value.hex()[:32]}...")
     print()
 
-    # Derive master keys using threshold computation
-    print("PHASE 2: BIP32 Master Key Derivation (Threshold)")
+    # Derive master keys using distributed MPC computation
+    print("PHASE 2: BIP32 Master Key Derivation (Distributed MPC)")
     print("-" * 80)
 
     seed = secrets.token_bytes(32)
     master_shares, master_pubkey, master_chain = \
-        ThresholdBIP32.derive_master_keys_threshold(key_shares, seed)
+        MPCBIP32.derive_master_keys_distributed(key_shares, seed)
 
-    print(f"✓ Derived master keys (threshold computation)")
+    print(f"Derived master keys (all {num_parties} parties participated)")
     print(f"  Master public key: {master_pubkey.hex()}")
     print(f"  Chain code: {master_chain.hex()[:32]}...")
     print()
 
-    # Derive account xpub (one-time threshold operation)
-    print("PHASE 3: Account xpub Derivation (ONE-TIME Threshold Operation)")
+    # Derive account xpub (one-time MPC operation)
+    print("PHASE 3: Account xpub Derivation (ONE-TIME MPC Operation)")
     print("-" * 80)
     print("Path: m/44'/0'/0' (Bitcoin account 0)")
 
-    account_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    account_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=0, account=0
     )
 
-    print(f"✓ Account xpub derived:")
+    print(f"Account xpub derived:")
     print(f"  Public key: {account_xpub.public_key.hex()}")
     print(f"  Chain code: {account_xpub.chain_code.hex()[:32]}...")
     print()
 
-    # Now derive unlimited addresses (no threshold computation!)
-    print("PHASE 4: Address Generation (UNLIMITED, No Threshold!)")
+    # Now derive unlimited addresses (no MPC computation needed!)
+    print("PHASE 4: Address Generation (UNLIMITED, No MPC needed!)")
     print("-" * 80)
     print("Deriving 10 receiving addresses from xpub alone...")
     print()
@@ -602,7 +605,7 @@ if __name__ == "__main__":
     print()
     print("=" * 80)
     print("SUCCESS!")
-    print("✓ Private key shares NEVER combined")
-    print("✓ Threshold computation only for account setup")
-    print("✓ Unlimited addresses derived from xpub")
+    print("Private key shares NEVER combined")
+    print("MPC computation only for account setup (all parties required)")
+    print("Unlimited addresses derived from xpub")
     print("=" * 80)

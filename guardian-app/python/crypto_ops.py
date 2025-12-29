@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GuardianVault Crypto Operations CLI
-This script provides a command-line interface for threshold signing operations.
+This script provides a command-line interface for MPC signing operations.
 It's called by the Electron main process via subprocess.
 """
 
@@ -14,7 +14,7 @@ from pathlib import Path
 parent_dir = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(parent_dir))
 
-from guardianvault.threshold_signing import ThresholdSigner
+from guardianvault.mpc_signing import MPCSigner
 
 
 def round1_generate_nonce(key_share_data: dict, message_hash: str) -> dict:
@@ -33,7 +33,7 @@ def round1_generate_nonce(key_share_data: dict, message_hash: str) -> dict:
         x_i = int(key_share_data['x'], 16)
 
         # Create signer instance
-        signer = ThresholdSigner()
+        signer = MPCSigner()
 
         # Generate nonce for Round 1
         result = signer.sign_round1_generate_nonce(x_i, message_hash)
@@ -73,7 +73,7 @@ def round3_compute_signature_share(
         x_i = int(key_share_data['x'], 16)
 
         # Create signer instance
-        signer = ThresholdSigner()
+        signer = MPCSigner()
 
         # Compute signature share for Round 3
         result = signer.sign_round3_compute_signature_share(

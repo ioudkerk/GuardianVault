@@ -102,7 +102,7 @@ tx_resp = requests.get("http://localhost:8000/api/transactions/tx_QwKiG6Qg7Xes")
 our_tx = tx_resp.json()
 
 from guardianvault.bitcoin_transaction import BitcoinTransactionBuilder
-from guardianvault.threshold_mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
+from guardianvault.mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation
 
 with open('demo_output/vault_config.json', 'r') as f:
     vault_config = json.load(f)

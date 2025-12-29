@@ -10,20 +10,20 @@ import secrets
 import json
 from typing import List, Dict
 
-from guardianvault.threshold_mpc_keymanager import (
-    ThresholdKeyGeneration,
-    ThresholdBIP32,
+from guardianvault.mpc_keymanager import (
+    MPCKeyGeneration,
+    MPCBIP32,
     ExtendedPublicKey,
     KeyShare,
     save_xpub_to_file,
     load_xpub_from_file
 )
-from guardianvault.threshold_addresses import (
+from guardianvault.mpc_addresses import (
     BitcoinAddressGenerator,
     EthereumAddressGenerator
 )
-from guardianvault.threshold_signing import (
-    ThresholdSigningWorkflow
+from guardianvault.mpc_signing import (
+    MPCSigningWorkflow
 )
 
 
@@ -89,7 +89,7 @@ def simulate_async_setup():
     print("Step 1: Generate distributed key shares")
     print("-" * 80)
     num_parties = len(parties)
-    key_shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties)
+    key_shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties)
 
     for i, party in enumerate(parties):
         party.receive_key_share(key_shares[i])
@@ -102,7 +102,7 @@ def simulate_async_setup():
     print(f"Using seed: {seed.hex()[:32]}...")
 
     master_shares, master_pubkey, master_chain = \
-        ThresholdBIP32.derive_master_keys_threshold(key_shares, seed)
+        MPCBIP32.derive_master_keys_distributed(key_shares, seed)
 
     print(f"✓ Master public key: {master_pubkey.hex()[:32]}...")
     print()
@@ -110,7 +110,7 @@ def simulate_async_setup():
     # Step 3: Derive Bitcoin account xpub (threshold computation)
     print("Step 3: Derive Bitcoin account xpub m/44'/0'/0' (threshold)")
     print("-" * 80)
-    btc_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    btc_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=0, account=0
     )
     print(f"✓ Bitcoin xpub derived")
@@ -124,7 +124,7 @@ def simulate_async_setup():
     # Step 4: Derive Ethereum account xpub (threshold computation)
     print("Step 4: Derive Ethereum account xpub m/44'/60'/0' (threshold)")
     print("-" * 80)
-    eth_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    eth_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=60, account=0
     )
     print(f"✓ Ethereum xpub derived")
@@ -139,13 +139,13 @@ def simulate_async_setup():
     print("-" * 80)
 
     # For Bitcoin account
-    btc_account_shares, _, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, _, _ = MPCBIP32.derive_hardened_child_distributed(
         master_shares, master_pubkey, master_chain, 44
     )
-    btc_account_shares, _, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, _, _ = MPCBIP32.derive_hardened_child_distributed(
         btc_account_shares, None, _, 0
     )
-    btc_account_shares, _, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, _, _ = MPCBIP32.derive_hardened_child_distributed(
         btc_account_shares, None, _, 0
     )
 
@@ -153,13 +153,13 @@ def simulate_async_setup():
         party.receive_master_share("bitcoin", btc_account_shares[i])
 
     # For Ethereum account
-    eth_account_shares, _, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_account_shares, _, _ = MPCBIP32.derive_hardened_child_distributed(
         master_shares, master_pubkey, master_chain, 44
     )
-    eth_account_shares, _, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_account_shares, _, _ = MPCBIP32.derive_hardened_child_distributed(
         eth_account_shares, None, _, 60
     )
-    eth_account_shares, _, _ = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_account_shares, _, _ = MPCBIP32.derive_hardened_child_distributed(
         eth_account_shares, None, _, 0
     )
 
@@ -264,7 +264,7 @@ def simulate_transaction_signing(parties: List[MPCParty], address_info: Dict):
     print("Executing threshold signing protocol...")
     print()
 
-    signature = ThresholdSigningWorkflow.sign_message(
+    signature = MPCSigningWorkflow.sign_message(
         bitcoin_shares,
         message.encode('utf-8'),
         public_key

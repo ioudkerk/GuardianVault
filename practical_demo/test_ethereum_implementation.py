@@ -11,8 +11,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from guardianvault.rlp_encoding import encode, encode_int, encode_address, decode
 from guardianvault.ethereum_transaction import EthereumTransaction, EthereumTransactionBuilder
-from guardianvault.threshold_signing import ThresholdSignature, ThresholdSigner
-from guardianvault.threshold_mpc_keymanager import ThresholdKeyGeneration
+from guardianvault.mpc_signing import ThresholdSignature, MPCSigner
+from guardianvault.mpc_keymanager import MPCKeyGeneration
 
 
 def test_rlp_encoding():
@@ -102,7 +102,7 @@ def test_threshold_signing_with_ethereum():
 
     # Generate key shares
     num_parties = 3
-    key_shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties)
+    key_shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties)
     print(f"✓ Generated {num_parties} key shares")
     print(f"  Master public key: {master_pubkey.hex()[:32]}...")
 
@@ -120,11 +120,11 @@ def test_threshold_signing_with_ethereum():
     print(f"✓ Transaction signing hash: 0x{message_hash.hex()[:32]}...")
 
     # Import signing workflow
-    from guardianvault.threshold_signing import ThresholdSigningWorkflow
+    from guardianvault.mpc_signing import MPCSigningWorkflow
 
     # Sign the message
     print("\n  Performing threshold signing...")
-    signature = ThresholdSigningWorkflow.sign_message(
+    signature = MPCSigningWorkflow.sign_message(
         key_shares=key_shares,
         message=message_hash,
         public_key=master_pubkey,
@@ -136,7 +136,7 @@ def test_threshold_signing_with_ethereum():
     print(f"  s: {hex(signature.s)[:32]}...")
 
     # Verify signature
-    is_valid = ThresholdSigner.verify_signature(
+    is_valid = MPCSigner.verify_signature(
         public_key=master_pubkey,
         message_hash=message_hash,
         signature=signature
@@ -147,7 +147,7 @@ def test_threshold_signing_with_ethereum():
     # Recover v parameter
     print("\n  Recovering Ethereum v parameter...")
     try:
-        v = ThresholdSigner.recover_ethereum_v(
+        v = MPCSigner.recover_ethereum_v(
             public_key=master_pubkey,
             message_hash=message_hash,
             signature=signature
@@ -182,12 +182,12 @@ def test_integration():
     # Step 1: Generate threshold keys
     print("\nStep 1: Generate threshold keys...")
     num_parties = 2
-    key_shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties)
+    key_shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties)
     print(f"✓ Generated {num_parties}-of-{num_parties} threshold key")
 
     # Step 2: Derive Ethereum address
     print("\nStep 2: Derive Ethereum address...")
-    from guardianvault.threshold_addresses import EthereumAddressGenerator
+    from guardianvault.mpc_addresses import EthereumAddressGenerator
 
     sender_address = EthereumAddressGenerator.pubkey_to_address(master_pubkey)
     print(f"✓ Sender address: {sender_address}")
@@ -218,9 +218,9 @@ def test_integration():
 
     # Step 5: MPC signing
     print("\nStep 5: Perform MPC signing...")
-    from guardianvault.threshold_signing import ThresholdSigningWorkflow
+    from guardianvault.mpc_signing import MPCSigningWorkflow
 
-    signature = ThresholdSigningWorkflow.sign_message(
+    signature = MPCSigningWorkflow.sign_message(
         key_shares=key_shares,
         message=signing_hash,
         public_key=master_pubkey,
@@ -230,7 +230,7 @@ def test_integration():
 
     # Step 6: Recover v parameter
     print("\nStep 6: Recover Ethereum v parameter...")
-    v = ThresholdSigner.recover_ethereum_v(
+    v = MPCSigner.recover_ethereum_v(
         public_key=master_pubkey,
         message_hash=signing_hash,
         signature=signature

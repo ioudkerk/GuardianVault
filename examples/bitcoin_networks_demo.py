@@ -11,11 +11,11 @@ import secrets
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from guardianvault.threshold_mpc_keymanager import (
-    ThresholdKeyGeneration,
-    ThresholdBIP32
+from guardianvault.mpc_keymanager import (
+    MPCKeyGeneration,
+    MPCBIP32
 )
-from guardianvault.threshold_addresses import BitcoinAddressGenerator
+from guardianvault.mpc_addresses import BitcoinAddressGenerator
 
 
 def main():
@@ -30,7 +30,7 @@ def main():
     print("Step 1: Generate MPC key shares")
     print("-" * 80)
     num_parties = 3
-    key_shares, _ = ThresholdKeyGeneration.generate_shares(num_parties)
+    key_shares, _ = MPCKeyGeneration.generate_shares(num_parties)
     print(f"✓ Generated {num_parties} key shares")
     print()
 
@@ -39,14 +39,14 @@ def main():
     print("-" * 80)
     seed = secrets.token_bytes(32)
     master_shares, master_pubkey, master_chain = \
-        ThresholdBIP32.derive_master_keys_threshold(key_shares, seed)
+        MPCBIP32.derive_master_keys_distributed(key_shares, seed)
     print(f"✓ Master public key: {master_pubkey.hex()[:32]}...")
     print()
 
     # Derive Bitcoin account xpub (m/44'/0'/0')
     print("Step 3: Derive Bitcoin account xpub (m/44'/0'/0')")
     print("-" * 80)
-    btc_xpub = ThresholdBIP32.derive_account_xpub_threshold(
+    btc_xpub = MPCBIP32.derive_account_xpub_distributed(
         master_shares, master_chain, coin_type=0, account=0
     )
     print(f"✓ Bitcoin xpub: {btc_xpub.public_key.hex()[:32]}...")

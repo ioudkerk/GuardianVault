@@ -67,6 +67,14 @@ The core threshold cryptography system is fully operational:
 - **[Guardian App](docs/GUARDIAN_APP_IMPLEMENTATION.md)** - Desktop application
 - **[Project Summary](docs/PROJECT_SUMMARY.md)** - Overview
 
+### 🔒 Security Documentation
+- **[Security Analysis](docs/SECURITY_ANALYSIS.md)** - ⚠️ **MUST READ before production use**
+  - Implementation classification (custom vs production-standard)
+  - Security model (honest-but-curious vs malicious)
+  - Concrete attack scenarios and limitations
+  - When this implementation is suitable (and when it's not)
+  - Roadmap to production-grade security
+
 ### 🔬 Testing & Development
 - **[Test Results](TESTING_SUMMARY.md)** - Latest test results
 - **[Installation Guide](INSTALL.md)** - Setup instructions

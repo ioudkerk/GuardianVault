@@ -44,16 +44,28 @@ Complete documentation for GuardianVault - Enterprise-Grade Cryptocurrency Custo
    - Security analysis and attack vectors
    - Mathematical proofs and examples
 
+### Security Analysis
+
+6. **[SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md)** - Comprehensive security analysis ⚠️
+   - **Implementation classification** (custom vs production-standard protocols)
+   - **Security model**: Honest-but-curious vs malicious adversaries
+   - **Concrete attack scenarios** with code examples
+   - **What zero-knowledge proofs protect against**
+   - **When this implementation is suitable** (and when it's not)
+   - **Roadmap to production-grade security**
+   - **Recommendations by use case**
+   - **Required reading before production use**
+
 ### For UI/UX and Implementation
 
-6. **[UI_ARCHITECTURE.md](UI_ARCHITECTURE.md)** - Complete UI/UX specification
+7. **[UI_ARCHITECTURE.md](UI_ARCHITECTURE.md)** - Complete UI/UX specification
    - Admin Web Dashboard design
    - Guardian Desktop App design
    - Coordination Server architecture
    - API specifications
    - Implementation roadmap
 
-7. **[GUARDIAN_APP_IMPLEMENTATION.md](GUARDIAN_APP_IMPLEMENTATION.md)** - Guardian Desktop App implementation
+8. **[GUARDIAN_APP_IMPLEMENTATION.md](GUARDIAN_APP_IMPLEMENTATION.md)** - Guardian Desktop App implementation
    - Complete Electron app structure
    - Security architecture
    - Feature implementation details
@@ -84,6 +96,9 @@ Complete documentation for GuardianVault - Enterprise-Grade Cryptocurrency Custo
 
 **I want to understand the Guardian App:**
 → See [GUARDIAN_APP_IMPLEMENTATION.md](GUARDIAN_APP_IMPLEMENTATION.md)
+
+**I want to understand security implications and limitations:**
+→ **MUST READ**: [SECURITY_ANALYSIS.md](SECURITY_ANALYSIS.md)
 
 ### By Implementation
 

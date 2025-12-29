@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """
-Threshold ECDSA Signing
+MPC ECDSA Signing with Additive Secret Sharing
 Allows parties to sign transactions WITHOUT reconstructing the private key
+
+This is an (n,n) scheme - all parties must participate to produce a signature.
+For true threshold (t,n) schemes, see Shamir-based implementations.
 
 Protocol (Additive Secret Sharing):
 1. Each party generates random nonce share
@@ -15,7 +18,7 @@ import secrets
 from typing import List, Tuple, Dict
 from dataclasses import dataclass
 
-from .threshold_mpc_keymanager import (
+from .mpc_keymanager import (
     KeyShare,
     EllipticCurvePoint,
     SECP256K1_N
@@ -72,8 +75,8 @@ class ThresholdSignature:
         return r_bytes + s_bytes
 
 
-class ThresholdSigner:
-    """Threshold ECDSA signing protocol"""
+class MPCSigner:
+    """MPC ECDSA signing protocol with additive secret sharing (n-of-n scheme)"""
 
     @staticmethod
     def sign_round1_generate_nonce(party_id: int) -> Tuple[int, bytes]:
@@ -284,7 +287,7 @@ class ThresholdSigner:
 
                 # Find y coordinate for R
                 # Solve: y^2 = x^3 + 7 (mod p) for secp256k1
-                from .threshold_mpc_keymanager import SECP256K1_P
+                from .mpc_keymanager import SECP256K1_P
 
                 x_coord = r
                 y_squared = (pow(x_coord, 3, SECP256K1_P) + 7) % SECP256K1_P
@@ -321,8 +324,8 @@ class ThresholdSigner:
         raise ValueError("Could not recover v parameter from signature")
 
 
-class ThresholdSigningWorkflow:
-    """Complete threshold signing workflow (simulating async communication)"""
+class MPCSigningWorkflow:
+    """Complete MPC signing workflow with additive secret sharing (simulating async communication)"""
 
     @staticmethod
     def sign_message(
@@ -367,7 +370,7 @@ class ThresholdSigningWorkflow:
         r_share_points = []
 
         for share in key_shares:
-            k_i, R_i = ThresholdSigner.sign_round1_generate_nonce(share.party_id)
+            k_i, R_i = MPCSigner.sign_round1_generate_nonce(share.party_id)
             nonce_shares.append(k_i)
             r_share_points.append(R_i)
             print(f"  Party {share.party_id}: Generated nonce share")
@@ -377,7 +380,7 @@ class ThresholdSigningWorkflow:
         # ROUND 2: Combine nonces (can be done by any party)
         print("ROUND 2: Combine Nonce Points")
         print("-" * 60)
-        R_combined, r = ThresholdSigner.sign_round2_combine_nonces(r_share_points)
+        R_combined, r = MPCSigner.sign_round2_combine_nonces(r_share_points)
         print(f"  Combined R point: ({hex(R_combined.x)[:20]}..., {hex(R_combined.y)[:20]}...)")
         print(f"  r value: {hex(r)[:32]}...")
         print()
@@ -393,7 +396,7 @@ class ThresholdSigningWorkflow:
         s_shares = []
 
         for i, share in enumerate(key_shares):
-            s_i = ThresholdSigner.sign_round3_compute_signature_share(
+            s_i = MPCSigner.sign_round3_compute_signature_share(
                 share, nonce_shares[i], message_hash, r, k_total, len(key_shares)
             )
             s_shares.append(s_i)
@@ -404,7 +407,7 @@ class ThresholdSigningWorkflow:
         # ROUND 4: Combine signatures
         print("ROUND 4: Combine Signature Shares")
         print("-" * 60)
-        signature = ThresholdSigner.sign_round4_combine_signatures(s_shares, r)
+        signature = MPCSigner.sign_round4_combine_signatures(s_shares, r)
         print(f"  Final signature:")
         print(f"    r: {hex(signature.r)[:32]}...")
         print(f"    s: {hex(signature.s)[:32]}...")
@@ -413,7 +416,7 @@ class ThresholdSigningWorkflow:
         # Verify signature
         print("VERIFICATION")
         print("-" * 60)
-        valid = ThresholdSigner.verify_signature(public_key, message_hash, signature)
+        valid = MPCSigner.verify_signature(public_key, message_hash, signature)
         print(f"  Signature valid: {valid}")
         print()
 
@@ -422,36 +425,36 @@ class ThresholdSigningWorkflow:
 
 if __name__ == "__main__":
     import secrets as sec
-    from .threshold_mpc_keymanager import ThresholdKeyGeneration
+    from .mpc_keymanager import MPCKeyGeneration
 
     print("=" * 80)
-    print("THRESHOLD ECDSA SIGNING DEMO")
+    print("MPC ECDSA SIGNING WITH ADDITIVE SECRET SHARING - DEMO")
     print("Sign transactions WITHOUT reconstructing private key!")
     print("=" * 80)
     print()
 
     # Setup: Generate distributed key
     num_parties = 3
-    print(f"Setup: {num_parties} parties")
+    print(f"Setup: {num_parties} parties ({num_parties}-of-{num_parties} scheme)")
     print("-" * 80)
 
-    key_shares, master_pubkey = ThresholdKeyGeneration.generate_shares(num_parties)
-    print(f"✓ Generated {num_parties} key shares")
-    print(f"✓ Master public key: {master_pubkey.hex()[:32]}...")
+    key_shares, master_pubkey = MPCKeyGeneration.generate_shares(num_parties)
+    print(f"Generated {num_parties} key shares")
+    print(f"Master public key: {master_pubkey.hex()[:32]}...")
     print()
 
     # Sign a message
     message = b"Send 1 BTC to Alice"
 
-    signature = ThresholdSigningWorkflow.sign_message(
+    signature = MPCSigningWorkflow.sign_message(
         key_shares, message, master_pubkey
     )
 
     print("=" * 80)
     print("SUCCESS!")
-    print("✓ Message signed using threshold protocol")
-    print("✓ Private key NEVER reconstructed")
-    print("✓ Each party only used their private share")
+    print("Message signed using MPC protocol (all parties participated)")
+    print("Private key NEVER reconstructed")
+    print("Each party only used their private share")
     print("=" * 80)
     print()
 

@@ -11,8 +11,8 @@ import requests
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation, SECP256K1_N, EllipticCurvePoint
-from guardianvault.threshold_signing import ThresholdSigner, ThresholdSignature
+from guardianvault.mpc_keymanager import ExtendedPublicKey, PublicKeyDerivation, SECP256K1_N, EllipticCurvePoint
+from guardianvault.mpc_signing import MPCSigner, ThresholdSignature
 
 
 def verify_mpc_computation(transaction_id: str, server_url: str, vault_config_file: str, share_files: list):
@@ -158,7 +158,7 @@ def verify_mpc_computation(transaction_id: str, server_url: str, vault_config_fi
     print(f"  Public key: {correct_pubkey.hex()[:32]}...")
 
     signature = ThresholdSignature(r=r, s=total_s)
-    valid = ThresholdSigner.verify_signature(correct_pubkey, message_hash, signature)
+    valid = MPCSigner.verify_signature(correct_pubkey, message_hash, signature)
 
     print(f"  ✓ Signature valid: {valid}")
 

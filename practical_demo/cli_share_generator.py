@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 CLI 1: Share Generator
-Creates threshold key shares and derives xpub keys for Bitcoin and Ethereum
+Creates MPC key shares and derives xpub keys for Bitcoin and Ethereum
+Uses additive secret sharing (n-of-n scheme - all parties must participate)
 """
 import sys
 import os
@@ -12,13 +13,13 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import (
-    ThresholdKeyGeneration,
-    ThresholdBIP32,
+from guardianvault.mpc_keymanager import (
+    MPCKeyGeneration,
+    MPCBIP32,
     ExtendedPublicKey,
     PublicKeyDerivation
 )
-from guardianvault.threshold_addresses import (
+from guardianvault.mpc_addresses import (
     BitcoinAddressGenerator,
     EthereumAddressGenerator
 )
@@ -41,7 +42,7 @@ def generate_shares_and_keys(num_guardians: int, threshold: int, output_dir: str
 
     # Step 1: Generate distributed key shares
     print("Step 1: Generating distributed key shares...")
-    key_shares, master_public_key = ThresholdKeyGeneration.generate_shares(
+    key_shares, master_public_key = MPCKeyGeneration.generate_shares(
         num_parties=num_guardians,
         threshold=threshold
     )
@@ -51,7 +52,7 @@ def generate_shares_and_keys(num_guardians: int, threshold: int, output_dir: str
     # Step 2: Derive master keys with BIP32
     print("\nStep 2: Deriving BIP32 master keys...")
     seed = b"GuardianVault Demo Seed 2025"  # In production, use secure random seed
-    master_shares, master_pub, chain_code = ThresholdBIP32.derive_master_keys_threshold(
+    master_shares, master_pub, chain_code = MPCBIP32.derive_master_keys_distributed(
         key_shares, seed
     )
     print(f"✓ Derived master keys")
@@ -60,15 +61,15 @@ def generate_shares_and_keys(num_guardians: int, threshold: int, output_dir: str
     # Step 3: Derive Bitcoin account shares (m/44'/0'/0') - ALL GUARDIANS TOGETHER
     print("\nStep 3: Deriving Bitcoin account shares (m/44'/0'/0')...")
     # Derive m/44'
-    purpose_shares, _, purpose_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    purpose_shares, _, purpose_chain = MPCBIP32.derive_hardened_child_distributed(
         master_shares, None, chain_code, 44
     )
     # Derive m/44'/0'
-    coin_shares, _, coin_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    coin_shares, _, coin_chain = MPCBIP32.derive_hardened_child_distributed(
         purpose_shares, None, purpose_chain, 0
     )
     # Derive m/44'/0'/0'
-    btc_account_shares, btc_account_pubkey, btc_account_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    btc_account_shares, btc_account_pubkey, btc_account_chain = MPCBIP32.derive_hardened_child_distributed(
         coin_shares, None, coin_chain, 0
     )
 
@@ -97,11 +98,11 @@ def generate_shares_and_keys(num_guardians: int, threshold: int, output_dir: str
     print("\nStep 4: Deriving Ethereum account shares (m/44'/60'/0')...")
     # Derive m/44' (reuse from Bitcoin)
     # Derive m/44'/60'
-    eth_coin_shares, _, eth_coin_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_coin_shares, _, eth_coin_chain = MPCBIP32.derive_hardened_child_distributed(
         purpose_shares, None, purpose_chain, 60
     )
     # Derive m/44'/60'/0'
-    eth_account_shares, eth_account_pubkey, eth_account_chain = ThresholdBIP32.derive_hardened_child_threshold(
+    eth_account_shares, eth_account_pubkey, eth_account_chain = MPCBIP32.derive_hardened_child_distributed(
         eth_coin_shares, None, eth_coin_chain, 0
     )
 

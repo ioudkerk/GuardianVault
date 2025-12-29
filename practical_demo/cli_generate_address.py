@@ -12,11 +12,11 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from guardianvault.threshold_mpc_keymanager import (
+from guardianvault.mpc_keymanager import (
     ExtendedPublicKey,
     PublicKeyDerivation
 )
-from guardianvault.threshold_addresses import (
+from guardianvault.mpc_addresses import (
     BitcoinAddressGenerator,
     EthereumAddressGenerator
 )

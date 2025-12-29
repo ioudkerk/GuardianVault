@@ -1,5 +1,5 @@
 """
-MPC Coordinator - Orchestrates the 4-round threshold ECDSA signing protocol
+MPC Coordinator - Orchestrates the 4-round MPC ECDSA signing protocol with additive secret sharing
 """
 import sys
 import os
@@ -12,8 +12,8 @@ import logging
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from guardianvault.threshold_signing import ThresholdSigner
-from guardianvault.threshold_mpc_keymanager import EllipticCurvePoint, SECP256K1_N
+from guardianvault.mpc_signing import MPCSigner
+from guardianvault.mpc_keymanager import EllipticCurvePoint, SECP256K1_N
 
 logger = logging.getLogger(__name__)
 
